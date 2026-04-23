@@ -1,0 +1,52 @@
+{
+    "users": [
+        {
+            "id": "U001",
+            "fullName": "วิชัย มั่นคง",
+            "email": "wichai@example.com",
+            "phone": "083-456-7890",
+            "role": "ผู้จัดการ",
+            "isActive": true
+        },
+        {
+            "id": "U002",
+            "fullName": "สมชาย ใจดี",
+            "email": "somchai@example.com",
+            "phone": "082-345-6789",
+            "role": "แคชเชียร์",
+            "isActive": false
+        },
+        {
+            "id": "U003",
+            "fullName": "สมหญิง รักงาน",
+            "email": "somying@example.com",
+            "phone": "081-234-5678",
+            "role": "แอดมิน",
+            "isActive": true
+        },
+        {
+            "id": "U004",
+            "fullName": "นิภา สุขใจ",
+            "email": "nipa@example.com",
+            "phone": "084-567-8901",
+            "role": "ผู้ดูแลระบบ",
+            "isActive": true
+        },
+        {
+            "id": "U005",
+            "fullName": "ธนา บุญมี",
+            "email": "thana@example.com",
+            "phone": "089-111-2233",
+            "role": "แคชเชียร์",
+            "isActive": true
+        },
+        {
+            "id": "U006",
+            "fullName": "กิตติ ศรีไทย",
+            "email": "kitti@example.com",
+            "phone": "086-222-4455",
+            "role": "แอดมิน",
+            "isActive": false
+        }
+    ]
+}
