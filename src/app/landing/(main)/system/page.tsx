@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Preload from "@/src/app/components/Preload";
 import SystemMenuTabs, {
   type SystemMenuKey,
 } from "@/src/app/components/system/SystemMenuTabs";
@@ -23,9 +24,24 @@ function formatThaiDateTime(date: Date) {
     .replace(",", "");
 }
 
+function getLoadingDetail(activeTab: SystemMenuKey) {
+  switch (activeTab) {
+    case "device":
+      return "กำลังโหลดการตั้งค่าระบบ";
+    case "entry_bill":
+      return "กำลังโหลดการตั้งค่าใบ Bill เข้าใช้บริการ";
+    case "paid_bill":
+      return "กำลังโหลดการตั้งค่าใบ Bill หลังชำระ";
+    default:
+      return "ระบบลานจอดรถ";
+  }
+}
+
 function SettingSystemPage() {
   const [activeTab, setActiveTab] = useState<SystemMenuKey>("device");
   const [currentDateTime, setCurrentDateTime] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     function updateDateTime() {
@@ -40,6 +56,26 @@ function SettingSystemPage() {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setProgress(8);
+
+    const timers = [
+      window.setTimeout(() => setProgress(18), 120),
+      window.setTimeout(() => setProgress(60), 260),
+      window.setTimeout(() => setProgress(82), 420),
+      window.setTimeout(() => setProgress(100), 560),
+      window.setTimeout(() => {
+        setLoading(false);
+        setProgress(0);
+      }, 750),
+    ];
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [activeTab]);
 
   const pageTitle = useMemo(() => {
     switch (activeTab) {
@@ -85,6 +121,18 @@ function SettingSystemPage() {
       default:
         return <SystemDeviceConfigContent />;
     }
+  }
+
+  if (loading) {
+    return (
+      <Preload
+        open
+        progress={progress}
+        message="กำลังโหลดข้อมูล..."
+        detail={getLoadingDetail(activeTab)}
+        fullscreen={false}
+      />
+    );
   }
 
   return (

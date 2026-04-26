@@ -26,8 +26,11 @@ function Preload({
 
     return (
         <div
-            className={`${fullscreen ? "fixed inset-0 z-[9999]" : "w-full"
-                } flex min-h-screen items-center justify-center bg-[#F4F4F4] px-6 py-10`}
+            className={
+                fullscreen
+                    ? "fixed inset-0 z-[9999] flex min-h-screen items-center justify-center bg-[#F4F4F4] px-6 py-10"
+                    : "flex min-h-screen w-full items-center justify-center bg-[#F4F4F4] px-6 py-10"
+            }
         >
             <div className="flex w-full max-w-[520px] flex-col items-center">
                 <div className="relative flex h-[170px] w-[170px] items-center justify-center">
@@ -70,7 +73,9 @@ function Preload({
 
                 <div className="mt-14 flex w-full flex-col items-center">
                     <div className="flex w-full max-w-[360px] items-center gap-4">
-                        <span className="text-[20px] leading-none text-[#0D1B2A]">•</span>
+                        <span className="text-[20px] leading-none text-[#0D1B2A]">
+                            •
+                        </span>
 
                         <div className="relative h-[6px] flex-1 overflow-hidden rounded-full bg-[#0D1B2A]">
                             <div

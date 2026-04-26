@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
+import { getStoredUser, hasPermission, type PermissionKey} from "@/src/app/lib/permissions";
+
 export type SettingMenuKey =
     | "device"
     | "pricing"
@@ -14,29 +17,55 @@ type SettingMenuTabsProps = {
 const menuItems: {
     key: SettingMenuKey;
     label: string;
+    permission: PermissionKey;
 }[] = [
         {
             key: "device",
             label: "การตั้งค่าอุปกรณ์",
+            permission: "devices",
         },
         {
             key: "pricing",
             label: "กำหนดค่าบริการ",
+            permission: "pricing",
         },
         {
             key: "channels",
             label: "ช่องทางการชำระค่าบริการ",
+            permission: "devices",
         },
         {
             key: "theme",
             label: "ธีม",
+            permission: "theme",
         },
     ];
 
 function SettingMenuTabs({ activeTab, onChange }: SettingMenuTabsProps) {
+    const user = getStoredUser();
+
+    const visibleMenuItems = useMemo(
+        () => menuItems.filter((item) => hasPermission(user, item.permission)),
+        [user]
+    );
+
+    useEffect(() => {
+        if (visibleMenuItems.length === 0) return;
+
+        const canUseActiveTab = visibleMenuItems.some(
+            (item) => item.key === activeTab
+        );
+
+        if (!canUseActiveTab) {
+            onChange(visibleMenuItems[0].key);
+        }
+    }, [activeTab, onChange, visibleMenuItems]);
+
+    if (visibleMenuItems.length === 0) return null;
+
     return (
         <div className="mt-6 flex flex-wrap gap-2 rounded-xl bg-[#E3E5E8] p-2 md:inline-flex">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
                 const isActive = item.key === activeTab;
 
                 return (

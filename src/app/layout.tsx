@@ -1,14 +1,19 @@
-
 import "./globals.css";
 import type { Metadata } from "next";
+
 // Font
 import { Inter, Noto_Sans_Thai, Geist } from "next/font/google";
-// Components
-import Sidebar from "./components/Sidebar";
+
+// Providers
+import ApiFetchProvider from "@/src/app/providers/ApiFetchProvider";
+
+// Utils
 import { cn } from "@/src/app/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 /* -------------------- Font configuration -------------------- */
 
@@ -40,7 +45,7 @@ function RootLayout({ children }: { children: React.ReactNode }) {
       <body
         className={`${inter.variable} ${notoThai.variable} m-0 antialiased`}
       >
-        {children}
+        <ApiFetchProvider>{children}</ApiFetchProvider>
       </body>
     </html>
   );

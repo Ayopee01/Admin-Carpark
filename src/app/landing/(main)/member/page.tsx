@@ -8,6 +8,7 @@ import AddMemberModal from "@/src/app/components/member/AddMemberModal";
 import PermissionModal, { type PermissionItem } from "@/src/app/components/member/PermissionModal";
 //Types
 import type { CreateMemberPayload, Member, MemberRole, MemberStats, MemberStatus } from "@/src/app/type/member/member";
+import Preload from "@/src/app/components/Preload";
 
 const PERMISSIONS: PermissionItem[] = [
   {
@@ -158,14 +159,12 @@ function StatusToggle({
     <button
       type="button"
       onClick={onClick}
-      className={`relative h-[24px] w-[48px] rounded-full transition ${
-        checked ? "bg-[#21B947]" : "bg-[#D0D5DD]"
-      }`}
+      className={`relative h-[24px] w-[48px] rounded-full transition ${checked ? "bg-[#21B947]" : "bg-[#D0D5DD]"
+        }`}
     >
       <span
-        className={`absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full bg-white transition ${
-          checked ? "right-[3px]" : "left-[3px]"
-        }`}
+        className={`absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full bg-white transition ${checked ? "right-[3px]" : "left-[3px]"
+          }`}
       />
     </button>
   );
@@ -181,6 +180,7 @@ function MemberPage() {
 
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
   const [openAdd, setOpenAdd] = useState(false);
@@ -222,9 +222,12 @@ function MemberPage() {
   async function fetchMembers() {
     try {
       setLoading(true);
+      setProgress(8);
       setError("");
 
       const token = getToken();
+
+      setProgress(18);
 
       const [statsResponse, membersResponse] = await Promise.all([
         fetch("/api/members/stats", {
@@ -241,8 +244,15 @@ function MemberPage() {
         }),
       ]);
 
+      setProgress(55);
+
       const statsJson = await statsResponse.json().catch(() => null);
+
+      setProgress(70);
+
       const membersJson = await membersResponse.json().catch(() => null);
+
+      setProgress(82);
 
       if (!statsResponse.ok) {
         throw new Error(getErrorMessage(statsJson, "โหลดสถิติสมาชิกไม่สำเร็จ"));
@@ -256,10 +266,15 @@ function MemberPage() {
 
       setStats(statsJson as MemberStats);
       setMembers(Array.isArray(membersJson) ? membersJson : []);
+      setProgress(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setProgress(100);
     } finally {
-      setLoading(false);
+      window.setTimeout(() => {
+        setLoading(false);
+        setProgress(0);
+      }, 350);
     }
   }
 
@@ -273,16 +288,16 @@ function MemberPage() {
     const searchedMembers = !keyword
       ? members
       : members.filter((member) => {
-          const fullName = getMemberFullName(member).toLowerCase();
-          const email = (member.email ?? "").toLowerCase();
-          const phone = (member.phone ?? "").toLowerCase();
+        const fullName = getMemberFullName(member).toLowerCase();
+        const email = (member.email ?? "").toLowerCase();
+        const phone = (member.phone ?? "").toLowerCase();
 
-          return (
-            fullName.includes(keyword) ||
-            email.includes(keyword) ||
-            phone.includes(keyword)
-          );
-        });
+        return (
+          fullName.includes(keyword) ||
+          email.includes(keyword) ||
+          phone.includes(keyword)
+        );
+      });
 
     return [...searchedMembers].sort((a, b) => {
       const roleOrder = getRoleRank(b.role) - getRoleRank(a.role);
@@ -536,6 +551,18 @@ function MemberPage() {
     URL.revokeObjectURL(url);
   }
 
+  if (loading) {
+    return (
+      <Preload
+        open
+        progress={progress}
+        message="กำลังโหลดข้อมูล..."
+        detail="กำลังโหลดข้อมูลสมาชิก"
+        fullscreen={false}
+      />
+    );
+  }
+
   return (
     <>
       <section className="min-h-screen bg-[#F3F4F6] px-6 py-8 text-[#1F2937] md:px-8">
@@ -618,13 +645,7 @@ function MemberPage() {
               </thead>
 
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-10 py-10 text-[#6B7280]">
-                      กำลังโหลดข้อมูล...
-                    </td>
-                  </tr>
-                ) : filteredMembers.length === 0 ? (
+                {filteredMembers.length === 0 ? (
                   <tr>
                     <td
                       colSpan={6}

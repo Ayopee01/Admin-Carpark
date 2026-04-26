@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FiArrowRight, FiAtSign, FiEye, FiEyeOff, FiLock } from "react-icons/fi";
-import type {LoginResponse} from "@/src/app/type/auth/Login"
+import type { LoginResponse } from "@/src/app/type/auth/Login"
 
 function LoginPage() {
     const router = useRouter();
@@ -42,7 +42,7 @@ function LoginPage() {
 
             const data = (await res.json().catch(() => null)) as LoginResponse | null;
 
-            if (!res.ok || !data?.token || !data?.user) {
+            if (!res.ok || !data?.token || !data?.refreshToken || !data?.user) {
                 setError("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
                 return;
             }

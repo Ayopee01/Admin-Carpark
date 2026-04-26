@@ -37,8 +37,8 @@ function SystemMenuTabs({ activeTab, onChange }: SystemMenuTabsProps) {
                         type="button"
                         onClick={() => onChange(item.key)}
                         className={`rounded-lg px-4 py-3 text-[13px] font-semibold transition ${isActive
-                                ? "bg-white text-[#1F2933] shadow-sm"
-                                : "text-[#1F2933] hover:bg-white/70"
+                            ? "bg-white text-[#1F2933] shadow-sm"
+                            : "text-[#1F2933] hover:bg-white/70"
                             }`}
                     >
                         {item.label}

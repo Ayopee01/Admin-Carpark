@@ -11,6 +11,7 @@ import {
     LuUserRound,
 } from "react-icons/lu";
 
+import Preload from "@/src/app/components/Preload";
 import SummaryCard from "@/src/app/components/dashboard/SummaryCard";
 import RevenueGroupCard from "@/src/app/components/dashboard/RevenueGroupCard";
 import DateRangeFilter from "@/src/app/components/summary/DateRangeFilter";
@@ -35,6 +36,7 @@ function formatDateParam(date?: Date) {
 function SummaryPage() {
     const [data, setData] = useState<OverviewSummaryResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [progress, setProgress] = useState(0);
     const [error, setError] = useState("");
 
     const [selectedRange, setSelectedRange] = useState<DateRange | undefined>();
@@ -51,10 +53,12 @@ function SummaryPage() {
 
     useEffect(() => {
         let ignore = false;
+        let timer: number | undefined;
 
         async function fetchOverviewSummary() {
             try {
                 setLoading(true);
+                setProgress(8);
                 setError("");
 
                 const token =
@@ -72,21 +76,30 @@ function SummaryPage() {
                     query.set("endDate", selectedEndDate);
                 }
 
+                if (!ignore) {
+                    setProgress(18);
+                }
+
                 const response = await fetch(
-                    `/api/summary${query.toString() ? `?${query.toString()}` : ""
-                    }`,
+                    `/api/summary${query.toString() ? `?${query.toString()}` : ""}`,
                     {
                         method: "GET",
                         headers: {
-                            ...(token
-                                ? { Authorization: `Bearer ${token}` }
-                                : {}),
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
                         },
                         cache: "no-store",
                     }
                 );
 
+                if (!ignore) {
+                    setProgress(60);
+                }
+
                 const result = await response.json().catch(() => null);
+
+                if (!ignore) {
+                    setProgress(82);
+                }
 
                 if (!response.ok) {
                     throw new Error(
@@ -96,6 +109,7 @@ function SummaryPage() {
 
                 if (!ignore) {
                     setData(result as OverviewSummaryResponse);
+                    setProgress(100);
                 }
             } catch (err) {
                 if (!ignore) {
@@ -104,10 +118,16 @@ function SummaryPage() {
                             ? err.message
                             : "เกิดข้อผิดพลาดในการโหลดข้อมูล"
                     );
+                    setProgress(100);
                 }
             } finally {
                 if (!ignore) {
-                    setLoading(false);
+                    timer = window.setTimeout(() => {
+                        if (!ignore) {
+                            setLoading(false);
+                            setProgress(0);
+                        }
+                    }, 350);
                 }
             }
         }
@@ -116,6 +136,10 @@ function SummaryPage() {
 
         return () => {
             ignore = true;
+
+            if (timer) {
+                window.clearTimeout(timer);
+            }
         };
     }, [selectedEndDate, selectedStartDate]);
 
@@ -168,41 +192,13 @@ function SummaryPage() {
 
     if (loading) {
         return (
-            <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 md:px-8 md:py-8">
-                <div className="mx-auto max-w-[1320px] animate-pulse">
-                    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                            <div className="h-10 w-[220px] rounded bg-[#D7D9DD]" />
-                            <div className="mt-3 h-4 w-[220px] rounded bg-[#D7D9DD]" />
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-[180px] rounded-full bg-[#D7D9DD]" />
-                            <div className="h-10 w-[120px] rounded-full bg-[#D7D9DD]" />
-                        </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <div className="h-[138px] rounded-[8px] bg-[#E4E6E8]" />
-                        <div className="h-[138px] rounded-[8px] bg-[#E4E6E8]" />
-                        <div className="h-[138px] rounded-[8px] bg-[#E4E6E8]" />
-                    </div>
-
-                    <div className="mt-10">
-                        <div className="h-8 w-[200px] rounded bg-[#D7D9DD]" />
-                        <div className="mt-2 h-4 w-[240px] rounded bg-[#D7D9DD]" />
-                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                            <div className="h-[190px] rounded-[18px] bg-[#E4E6E8]" />
-                            <div className="h-[190px] rounded-[18px] bg-[#E4E6E8]" />
-                        </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                        <div className="h-[360px] rounded-[18px] bg-white" />
-                        <div className="h-[360px] rounded-[18px] bg-[#E4E6E8]" />
-                    </div>
-                </div>
-            </section>
+            <Preload
+                open
+                progress={progress}
+                message="กำลังโหลดข้อมูล..."
+                detail="กำลังโหลดข้อมูลยอดรวมทั้งหมด"
+                fullscreen={false}
+            />
         );
     }
 
@@ -272,7 +268,7 @@ function SummaryPage() {
                         title="บิลค้างชำระ"
                         value={formatNumber(data.summaryCards.pendingCount)}
                         suffix="pending"
-                        note={``}
+                        note=""
                         icon={<LuClock3 size={16} />}
                     />
                 </div>

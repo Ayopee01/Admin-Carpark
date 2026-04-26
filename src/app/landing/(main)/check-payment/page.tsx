@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LuCarFront, LuChevronDown, LuSearch } from "react-icons/lu";
+
+import Preload from "@/src/app/components/Preload";
 import TransactionsTable from "@/src/app/components/check-payment/TransactionsTable";
 import PaymentModal from "@/src/app/components/check-payment/PaymentModal";
+
 import type {
   TransactionEditDraft,
   TransactionItem,
   TransactionListResponse,
   TransactionPaymentStatus,
 } from "@/src/app/type/check-payment/transactions";
-
-type ApiErrorResponse = {
-  message?: string;
-  ok?: boolean;
-};
 
 type RawTransactionItem = Partial<TransactionItem> & {
   payment?: Partial<TransactionItem["payment"]>;
@@ -119,7 +117,9 @@ function CheckPaymentPage() {
   const [status, setStatus] = useState<"all" | TransactionPaymentStatus>("all");
   const [items, setItems] = useState<TransactionItem[]>([]);
   const [total, setTotal] = useState(0);
+
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -129,12 +129,29 @@ function CheckPaymentPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
 
-  async function fetchTransactions() {
+  const loadingTimerRef = useRef<number | null>(null);
+
+  function finishLoadingAfterDelay() {
+    if (loadingTimerRef.current) {
+      window.clearTimeout(loadingTimerRef.current);
+    }
+
+    loadingTimerRef.current = window.setTimeout(() => {
+      setLoading(false);
+      setProgress(0);
+      loadingTimerRef.current = null;
+    }, 350);
+  }
+
+  async function fetchTransactions(): Promise<void> {
     try {
       setLoading(true);
+      setProgress(8);
       setError("");
 
       const token = localStorage.getItem("token");
+
+      setProgress(18);
 
       const response = await fetch("/api/check-payment/transactions", {
         method: "GET",
@@ -145,7 +162,11 @@ function CheckPaymentPage() {
         cache: "no-store",
       });
 
+      setProgress(60);
+
       const raw: unknown = await response.json().catch(() => null);
+
+      setProgress(82);
 
       if (!response.ok) {
         throw new Error(getErrorMessage(raw, "ไม่สามารถโหลดข้อมูลได้"));
@@ -159,15 +180,23 @@ function CheckPaymentPage() {
 
       setItems(normalizedItems);
       setTotal(raw.meta?.total ?? normalizedItems.length);
+      setProgress(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setProgress(100);
     } finally {
-      setLoading(false);
+      finishLoadingAfterDelay();
     }
   }
 
   useEffect(() => {
-    fetchTransactions();
+    void fetchTransactions();
+
+    return () => {
+      if (loadingTimerRef.current) {
+        window.clearTimeout(loadingTimerRef.current);
+      }
+    };
   }, []);
 
   function handleSearch() {
@@ -211,16 +240,19 @@ function CheckPaymentPage() {
 
       const token = localStorage.getItem("token");
 
-      const response = await fetch(`/api/check-payment/transactions/${id}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          plateNo: nextPlateNo,
-        }),
-      });
+      const response = await fetch(
+        `/api/check-payment/transactions/${id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            plateNo: nextPlateNo,
+          }),
+        }
+      );
 
       const raw: unknown = await response.json().catch(() => null);
 
@@ -261,6 +293,18 @@ function CheckPaymentPage() {
       return matchPlate && matchStatus;
     });
   }, [items, searchPlate, status]);
+
+  if (loading) {
+    return (
+      <Preload
+        open
+        progress={progress}
+        message="กำลังโหลดข้อมูล..."
+        detail="ตรวจสอบและชำระเงิน"
+        fullscreen={false}
+      />
+    );
+  }
 
   return (
     <>
@@ -321,7 +365,9 @@ function CheckPaymentPage() {
                   <select
                     value={status}
                     onChange={(event) =>
-                      setStatus(event.target.value as "all" | TransactionPaymentStatus)
+                      setStatus(
+                        event.target.value as "all" | TransactionPaymentStatus
+                      )
                     }
                     className="appearance-none rounded-full bg-white px-5 py-2 pr-10 text-[14px] font-semibold text-[#1F2933] outline-none"
                   >
@@ -338,11 +384,7 @@ function CheckPaymentPage() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="px-6 py-10 text-[15px] text-[#47525E]">
-                กำลังโหลดข้อมูล...
-              </div>
-            ) : error ? (
+            {error ? (
               <div className="px-6 py-10 text-[15px] text-red-600">{error}</div>
             ) : (
               <TransactionsTable
@@ -359,7 +401,9 @@ function CheckPaymentPage() {
             )}
           </div>
 
-          <div className="mt-4 text-sm text-[#6B7280]">ทั้งหมด {total} รายการ</div>
+          <div className="mt-4 text-sm text-[#6B7280]">
+            ทั้งหมด {total} รายการ
+          </div>
         </div>
       </section>
 

@@ -1,29 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BadgeCheck, Clock3, DoorOpen, MonitorSmartphone, QrCode, Ticket, UserRound } from "lucide-react";
+import {
+    BadgeCheck,
+    Clock3,
+    DoorOpen,
+    MonitorSmartphone,
+    QrCode,
+    Ticket,
+    UserRound,
+} from "lucide-react";
+
+import Preload from "@/src/app/components/Preload";
 import SummaryCard from "@/src/app/components/dashboard/SummaryCard";
 import RevenueGroupCard from "@/src/app/components/dashboard/RevenueGroupCard";
 import ChannelCard from "@/src/app/components/dashboard/ChannelCard";
-import type { DashboardChannelItem, DashboardResponse, DashboardRevenueGroup } from "@/src/app/type/dashboard/dashboard";
+
+import type {
+    DashboardChannelItem,
+    DashboardResponse,
+    DashboardRevenueGroup,
+} from "@/src/app/type/dashboard/dashboard";
 
 function DashboardPage() {
     const [data, setData] = useState<DashboardResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const [progress, setProgress] = useState(0);
     const [error, setError] = useState("");
 
     useEffect(() => {
         let ignore = false;
+        let timer: number | undefined;
 
         async function fetchDashboard() {
             try {
                 setLoading(true);
+                setProgress(8);
                 setError("");
 
                 const token =
                     typeof window !== "undefined"
                         ? localStorage.getItem("token")
                         : null;
+
+                setProgress(18);
 
                 const response = await fetch("/api/dashboard", {
                     method: "GET",
@@ -33,7 +53,15 @@ function DashboardPage() {
                     cache: "no-store",
                 });
 
+                if (!ignore) {
+                    setProgress(60);
+                }
+
                 const result = await response.json().catch(() => null);
+
+                if (!ignore) {
+                    setProgress(82);
+                }
 
                 if (!response.ok) {
                     throw new Error(
@@ -43,6 +71,7 @@ function DashboardPage() {
 
                 if (!ignore) {
                     setData(result as DashboardResponse);
+                    setProgress(100);
                 }
             } catch (err) {
                 if (!ignore) {
@@ -51,10 +80,16 @@ function DashboardPage() {
                             ? err.message
                             : "เกิดข้อผิดพลาดในการโหลดข้อมูล"
                     );
+                    setProgress(100);
                 }
             } finally {
                 if (!ignore) {
-                    setLoading(false);
+                    timer = window.setTimeout(() => {
+                        if (!ignore) {
+                            setLoading(false);
+                            setProgress(0);
+                        }
+                    }, 350);
                 }
             }
         }
@@ -63,6 +98,10 @@ function DashboardPage() {
 
         return () => {
             ignore = true;
+
+            if (timer) {
+                window.clearTimeout(timer);
+            }
         };
     }, []);
 
@@ -101,43 +140,13 @@ function DashboardPage() {
 
     if (loading) {
         return (
-            <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#1F2937] md:px-8 md:py-8">
-                <div className="mx-auto max-w-[1280px] animate-pulse">
-                    <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <div className="h-10 w-52 rounded bg-gray-300" />
-                            <div className="mt-3 h-4 w-56 rounded bg-gray-200" />
-                        </div>
-                        <div className="h-8 w-24 rounded-full bg-gray-200" />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
-                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
-                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
-                    </div>
-
-                    <div className="mt-10">
-                        <div className="h-8 w-64 rounded bg-gray-300" />
-                        <div className="mt-2 h-4 w-52 rounded bg-gray-200" />
-                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                            <div className="h-[185px] rounded-[18px] bg-gray-200" />
-                            <div className="h-[185px] rounded-[18px] bg-gray-200" />
-                        </div>
-                    </div>
-
-                    <div className="mt-10">
-                        <div className="h-8 w-80 rounded bg-gray-300" />
-                        <div className="mt-2 h-4 w-64 rounded bg-gray-200" />
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
-                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
-                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
-                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <Preload
+                open
+                progress={progress}
+                message="กำลังโหลดข้อมูล..."
+                detail="ระบบลานจอดรถ"
+                fullscreen={false}
+            />
         );
     }
 
@@ -154,9 +163,11 @@ function DashboardPage() {
     return (
         <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#2A3439] md:px-8 md:py-8">
             <div className="mx-auto max-w-[1280px]">
-                <div className="flex justify-between items-center mb-8">
+                <div className="mb-8 flex items-center justify-between">
                     <div>
-                        <h1 className="text-4xl font-bold leading-8 tracking-[-0.6px] text-[#2A3439;]">จัดการระบบ</h1>
+                        <h1 className="text-4xl font-bold leading-8 tracking-[-0.6px] text-[#2A3439]">
+                            จัดการระบบ
+                        </h1>
                         <p className="mt-2 text-xs font-medium leading-[18px] text-gray-500">
                             • ติดตามรายได้และปริมาณการใช้งาน
                         </p>
@@ -188,7 +199,9 @@ function DashboardPage() {
                     <SummaryCard
                         title="ชำระเงินแล้ว"
                         value={formatNumber(data.summaryCards.paidCount)}
-                        note={`฿ ${formatNumber(data.summaryCards.paidRevenue)}.00 Total`}
+                        note={`฿ ${formatNumber(
+                            data.summaryCards.paidRevenue
+                        )}.00 Total`}
                         icon={<BadgeCheck size={16} strokeWidth={2.2} />}
                     />
 
@@ -196,7 +209,7 @@ function DashboardPage() {
                         title="บิลค้างชำระ"
                         value={formatNumber(data.summaryCards.pendingCount)}
                         suffix="pending"
-                        note={``}
+                        note=""
                         icon={<Clock3 size={16} strokeWidth={2.2} />}
                     />
                 </div>
@@ -217,7 +230,9 @@ function DashboardPage() {
                                 description={getRevenueDescription(group)}
                                 amountText={formatCurrency(group.amount)}
                                 percent={group.percent}
-                                icon={getChannelIcon(group.id === "staff" ? "user" : "qr")}
+                                icon={getChannelIcon(
+                                    group.id === "staff" ? "user" : "qr"
+                                )}
                             />
                         ))}
                     </div>
