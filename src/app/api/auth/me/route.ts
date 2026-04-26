@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
     try {
-        const baseUrl = process.env.BaseURL;
+        const baseUrl = process.env.BASE_URL;
 
         if (!baseUrl) {
             return NextResponse.json(

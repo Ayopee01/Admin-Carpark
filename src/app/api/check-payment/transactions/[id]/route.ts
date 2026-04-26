@@ -6,22 +6,29 @@ type RouteContext = {
     }>;
 };
 
-export async function GET(req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, { params }: RouteContext) {
     try {
-        const baseUrl = process.env.BaseURL;
+        const baseUrl = process.env.BASE_URL;
 
         if (!baseUrl) {
             return NextResponse.json(
-                { ok: false, message: "Missing BaseURL in environment variables" },
+                { ok: false, message: "Missing BASE_URL in environment variables" },
                 { status: 500 }
             );
         }
 
-        const { id } = await context.params;
-        const authorization = req.headers.get("authorization");
-        const search = req.nextUrl.search;
+        const { id } = await params;
 
-        const res = await fetch(`${baseUrl}/api/v1/transactions/${id}${search}`, {
+        if (!id) {
+            return NextResponse.json(
+                { ok: false, message: "Missing transaction id" },
+                { status: 400 }
+            );
+        }
+
+        const authorization = req.headers.get("authorization");
+
+        const response = await fetch(`${baseUrl}/api/v1/transactions/${id}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -30,12 +37,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
             cache: "no-store",
         });
 
-        const data = await res.json().catch(() => null);
+        const data = await response.json().catch(() => null);
 
-        return NextResponse.json(data, { status: res.status });
-    } catch {
+        return NextResponse.json(data, {
+            status: response.status,
+        });
+    } catch (error) {
+        console.error("Transaction detail route error:", error);
+
         return NextResponse.json(
-            { ok: false, message: "Fetch transaction detail failed" },
+            { ok: false, message: "Transaction detail fetch failed" },
             { status: 500 }
         );
     }

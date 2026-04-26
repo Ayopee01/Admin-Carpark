@@ -4,9 +4,116 @@ import { useEffect, useMemo, useState } from "react";
 import { LuCarFront, LuChevronDown, LuSearch } from "react-icons/lu";
 import TransactionsTable from "@/src/app/components/check-payment/TransactionsTable";
 import PaymentModal from "@/src/app/components/check-payment/PaymentModal";
-import type { TransactionEditDraft, TransactionItem, TransactionListResponse, TransactionPaymentStatus } from "@/src/app/type/check-payment/transactions";
+import type {
+  TransactionEditDraft,
+  TransactionItem,
+  TransactionListResponse,
+  TransactionPaymentStatus,
+} from "@/src/app/type/check-payment/transactions";
 
-export default function CheckPaymentPage() {
+type ApiErrorResponse = {
+  message?: string;
+  ok?: boolean;
+};
+
+type RawTransactionItem = Partial<TransactionItem> & {
+  payment?: Partial<TransactionItem["payment"]>;
+  paymentStatus?: TransactionPaymentStatus;
+  paymentMethod?: string | null;
+  status?: string;
+  statusLabel?: string;
+  totalPaid?: number;
+  outstandingBalance?: number;
+};
+
+type TransactionListApiResponse = {
+  data?: RawTransactionItem[];
+  meta?: TransactionListResponse["meta"];
+};
+
+function getErrorMessage(value: unknown, fallback: string) {
+  if (
+    value &&
+    typeof value === "object" &&
+    "message" in value &&
+    typeof value.message === "string"
+  ) {
+    return value.message;
+  }
+
+  return fallback;
+}
+
+function isTransactionListApiResponse(
+  value: unknown
+): value is TransactionListApiResponse {
+  if (!value || typeof value !== "object") return false;
+
+  return "data" in value || "meta" in value;
+}
+
+function mapPaymentStatus(item: RawTransactionItem): TransactionPaymentStatus {
+  if (item.payment?.status === "paid" || item.payment?.status === "unpaid") {
+    return item.payment.status;
+  }
+
+  if (item.paymentStatus === "paid" || item.paymentStatus === "unpaid") {
+    return item.paymentStatus;
+  }
+
+  if (item.status === "completed") {
+    return "paid";
+  }
+
+  if (item.statusLabel === "เสร็จสิ้น") {
+    return "paid";
+  }
+
+  if (
+    typeof item.outstandingBalance === "number" &&
+    item.outstandingBalance <= 0
+  ) {
+    return "paid";
+  }
+
+  return "unpaid";
+}
+
+function normalizeTransaction(item: RawTransactionItem): TransactionItem {
+  return {
+    id: item.id ?? "",
+    billNo: item.billNo ?? "-",
+    plateNo: item.plateNo ?? "-",
+    vehicleType: item.vehicleType ?? "-",
+    serviceType: item.serviceType ?? "-",
+    entryAt: item.entryAt ?? "",
+    exitAt: item.exitAt ?? "",
+    durationMinute: item.durationMinute ?? 0,
+    amount: item.amount ?? 0,
+    vat: item.vat ?? 0,
+    discount: item.discount ?? 0,
+    netAmount: item.netAmount ?? 0,
+    status: item.status ?? "pending",
+    payment: {
+      status: mapPaymentStatus(item),
+      method: item.payment?.method ?? item.paymentMethod ?? null,
+      paidAt: item.payment?.paidAt ?? null,
+      qrCodeText: item.payment?.qrCodeText ?? null,
+      qrCodeImageUrl: item.payment?.qrCodeImageUrl ?? null,
+      referenceNo: item.payment?.referenceNo ?? null,
+    },
+    receipt: {
+      receiptNo: item.receipt?.receiptNo ?? null,
+      issuedAt: item.receipt?.issuedAt ?? null,
+      footerText: item.receipt?.footerText ?? null,
+      printableText: item.receipt?.printableText ?? null,
+    },
+    createdAt: item.createdAt ?? "",
+    updatedAt: item.updatedAt ?? "",
+  };
+}
+
+function CheckPaymentPage() {
   const [plateInput, setPlateInput] = useState("");
   const [searchPlate, setSearchPlate] = useState("");
   const [status, setStatus] = useState<"all" | TransactionPaymentStatus>("all");
@@ -16,6 +123,7 @@ export default function CheckPaymentPage() {
   const [error, setError] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<TransactionEditDraft | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -37,15 +145,20 @@ export default function CheckPaymentPage() {
         cache: "no-store",
       });
 
-      const json =
-        (await response.json().catch(() => null)) as TransactionListResponse | null;
+      const raw: unknown = await response.json().catch(() => null);
 
-      if (!response.ok || !json) {
-        throw new Error("ไม่สามารถโหลดข้อมูลได้");
+      if (!response.ok) {
+        throw new Error(getErrorMessage(raw, "ไม่สามารถโหลดข้อมูลได้"));
       }
 
-      setItems(json.data ?? []);
-      setTotal(json.meta?.total ?? 0);
+      if (!isTransactionListApiResponse(raw)) {
+        throw new Error("รูปแบบข้อมูลรายการไม่ถูกต้อง");
+      }
+
+      const normalizedItems = (raw.data ?? []).map(normalizeTransaction);
+
+      setItems(normalizedItems);
+      setTotal(raw.meta?.total ?? normalizedItems.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -76,6 +189,7 @@ export default function CheckPaymentPage() {
   function handleChangeDraft(field: keyof TransactionEditDraft, value: string) {
     setDraft((prev) => {
       if (!prev) return prev;
+
       return {
         ...prev,
         [field]: value,
@@ -83,12 +197,44 @@ export default function CheckPaymentPage() {
     });
   }
 
-  async function handleDelete(id: string) {
-    // ถ้ายังไม่มี DELETE endpoint จริง ให้ลบจาก state ก่อน
-    // ถ้าภายหลัง backend มี DELETE ค่อยเปลี่ยนตรงนี้เป็น fetch DELETE
+  async function handleSaveEdit(id: string) {
+    const nextPlateNo = draft?.plateNo?.trim();
 
-    setItems((prev) => prev.filter((item) => item.id !== id));
-    handleCancelEdit();
+    if (!nextPlateNo) {
+      setError("กรุณากรอกเลขทะเบียน");
+      return;
+    }
+
+    try {
+      setSavingEditId(id);
+      setError("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`/api/check-payment/transactions/${id}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          plateNo: nextPlateNo,
+        }),
+      });
+
+      const raw: unknown = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(raw, "ไม่สามารถแก้ไขเลขทะเบียนได้"));
+      }
+
+      handleCancelEdit();
+      await fetchTransactions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setSavingEditId(null);
+    }
   }
 
   function handleOpenPayment(id: string) {
@@ -103,11 +249,14 @@ export default function CheckPaymentPage() {
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      const plateNo = item.plateNo ?? "";
+      const paymentStatus = item.payment?.status ?? "unpaid";
+
       const matchPlate = searchPlate
-        ? item.plateNo.toLowerCase().includes(searchPlate.toLowerCase())
+        ? plateNo.toLowerCase().includes(searchPlate.toLowerCase())
         : true;
 
-      const matchStatus = status === "all" ? true : item.payment.status === status;
+      const matchStatus = status === "all" ? true : paymentStatus === status;
 
       return matchPlate && matchStatus;
     });
@@ -199,11 +348,13 @@ export default function CheckPaymentPage() {
               <TransactionsTable
                 items={filteredItems}
                 editingId={editingId}
+                savingEditId={savingEditId}
                 draft={draft}
                 onChangeDraft={handleChangeDraft}
                 onPay={handleOpenPayment}
                 onStartEdit={handleStartEdit}
                 onCancelEdit={handleCancelEdit}
+                onSaveEdit={handleSaveEdit}
               />
             )}
           </div>
@@ -221,3 +372,5 @@ export default function CheckPaymentPage() {
     </>
   );
 }
+
+export default CheckPaymentPage;

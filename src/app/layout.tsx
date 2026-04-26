@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { Inter, Noto_Sans_Thai, Geist } from "next/font/google";
 // Components
 import Sidebar from "./components/Sidebar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/src/app/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 

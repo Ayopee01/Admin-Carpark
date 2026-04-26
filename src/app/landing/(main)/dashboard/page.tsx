@@ -1,94 +1,250 @@
 "use client";
 
-// Hooks
-import { useDashboard } from "@/src/app/hooks/useDashboard";
-// Lib
-import { buildChannelCards, buildServiceCards, buildSummaryCards } from "@/src/app/lib/dashboard/dashboard-ui";
-//Components
-import NoticeCard from "@/src/app/components/dashboard/NoticeCard";
-import DashboardSkeleton from "@/src/app/components/dashboard/DashboardSkeleton";
-import DashboardSectionTitle from "@/src/app/components/dashboard/DashboardSectionTitle";
-import DashboardStatCard from "@/src/app/components/dashboard/DashboardStatCard";
-import DashboardProgressCard from "@/src/app/components/dashboard/DashboardProgressCard";
+import { useEffect, useState } from "react";
+import { BadgeCheck, Clock3, DoorOpen, MonitorSmartphone, QrCode, Ticket, UserRound } from "lucide-react";
+import SummaryCard from "@/src/app/components/dashboard/SummaryCard";
+import RevenueGroupCard from "@/src/app/components/dashboard/RevenueGroupCard";
+import ChannelCard from "@/src/app/components/dashboard/ChannelCard";
+import type { DashboardChannelItem, DashboardResponse, DashboardRevenueGroup } from "@/src/app/type/dashboard/dashboard";
 
 function DashboardPage() {
-    const { overview, revenue, loading, error } = useDashboard();
+    const [data, setData] = useState<DashboardResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let ignore = false;
+
+        async function fetchDashboard() {
+            try {
+                setLoading(true);
+                setError("");
+
+                const token =
+                    typeof window !== "undefined"
+                        ? localStorage.getItem("token")
+                        : null;
+
+                const response = await fetch("/api/dashboard", {
+                    method: "GET",
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    cache: "no-store",
+                });
+
+                const result = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                    throw new Error(
+                        result?.message || "ไม่สามารถดึงข้อมูล Dashboard ได้"
+                    );
+                }
+
+                if (!ignore) {
+                    setData(result as DashboardResponse);
+                }
+            } catch (err) {
+                if (!ignore) {
+                    setError(
+                        err instanceof Error
+                            ? err.message
+                            : "เกิดข้อผิดพลาดในการโหลดข้อมูล"
+                    );
+                }
+            } finally {
+                if (!ignore) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        fetchDashboard();
+
+        return () => {
+            ignore = true;
+        };
+    }, []);
+
+    const formatNumber = (value: number) =>
+        new Intl.NumberFormat("en-US").format(value);
+
+    const formatCurrency = (value: number) =>
+        `฿${new Intl.NumberFormat("en-US").format(value)}`;
+
+    const getRevenueDescription = (group: DashboardRevenueGroup) => {
+        if (group.id === "staff") {
+            return "การชำระเงินสด ผ่านคนงานช่วยเหลือ";
+        }
+
+        if (group.id === "scan") {
+            return "สแกนจ่าย (แอป / คิวอาร์โค้ด)";
+        }
+
+        return "ข้อมูลรายได้";
+    };
+
+    const getChannelIcon = (icon: DashboardChannelItem["icon"]) => {
+        switch (icon) {
+            case "user":
+                return <UserRound size={16} strokeWidth={2.2} />;
+            case "qr":
+                return <QrCode size={16} strokeWidth={2.2} />;
+            case "kiosk":
+                return <MonitorSmartphone size={16} strokeWidth={2.2} />;
+            case "gate":
+                return <DoorOpen size={16} strokeWidth={2.2} />;
+            default:
+                return <Ticket size={16} strokeWidth={2.2} />;
+        }
+    };
 
     if (loading) {
-        return <DashboardSkeleton />;
-    }
-
-    if (error) {
         return (
-            <section className="min-h-full bg-[#EFEFEF] px-6 py-8 text-[#1F2933] md:px-8">
-                <div className="mx-auto max-w-[1400px]">
-                    <NoticeCard isError>{error}</NoticeCard>
+            <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#1F2937] md:px-8 md:py-8">
+                <div className="mx-auto max-w-[1280px] animate-pulse">
+                    <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <div className="h-10 w-52 rounded bg-gray-300" />
+                            <div className="mt-3 h-4 w-56 rounded bg-gray-200" />
+                        </div>
+                        <div className="h-8 w-24 rounded-full bg-gray-200" />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
+                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
+                        <div className="h-[138px] rounded-[8px] bg-gray-200" />
+                    </div>
+
+                    <div className="mt-10">
+                        <div className="h-8 w-64 rounded bg-gray-300" />
+                        <div className="mt-2 h-4 w-52 rounded bg-gray-200" />
+                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                            <div className="h-[185px] rounded-[18px] bg-gray-200" />
+                            <div className="h-[185px] rounded-[18px] bg-gray-200" />
+                        </div>
+                    </div>
+
+                    <div className="mt-10">
+                        <div className="h-8 w-80 rounded bg-gray-300" />
+                        <div className="mt-2 h-4 w-64 rounded bg-gray-200" />
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
+                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
+                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
+                            <div className="h-[216px] rounded-[18px] bg-gray-200" />
+                        </div>
+                    </div>
                 </div>
             </section>
         );
     }
 
-    const summaryCards = buildSummaryCards(overview, revenue);
-    const serviceCards = buildServiceCards(overview);
-    const channelCards = buildChannelCards(overview, revenue);
+    if (error || !data) {
+        return (
+            <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 md:px-8 md:py-8">
+                <div className="mx-auto max-w-[1280px] rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600">
+                    {error || "ไม่พบข้อมูล Dashboard"}
+                </div>
+            </section>
+        );
+    }
 
     return (
-        <section className="min-h-full bg-[#EFEFEF] px-5 py-6 text-[#1F2933] md:px-7 lg:p-14">
-            <div className="mx-auto max-w-[1360px]">
-                <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
+        <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#2A3439] md:px-8 md:py-8">
+            <div className="mx-auto max-w-[1280px]">
+                <div className="flex justify-between items-center mb-8">
                     <div>
-                        <h1 className="text-[34px] font-extrabold leading-none text-[#2B3640]">
-                            จัดการระบบ
-                        </h1>
-
-                        <p className="mt-3 text-[13px] text-[#67727E]">
+                        <h1 className="text-4xl font-bold leading-8 tracking-[-0.6px] text-[#2A3439;]">จัดการระบบ</h1>
+                        <p className="mt-2 text-xs font-medium leading-[18px] text-gray-500">
                             • ติดตามรายได้และปริมาณการใช้งาน
                         </p>
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-full border border-[#59D46B] bg-[#F5FFF6] px-4 py-1.5 text-[11px] font-semibold text-[#34B44C]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#34B44C]" />
-                        <span>Real-Time</span>
+                    <div
+                        className={`flex h-10 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold ${data.isRealtime
+                            ? "border-sm bg-white text-[#38B449]"
+                            : "border-sm bg-white text-[#667085]"
+                            }`}
+                    >
+                        <span
+                            className={`h-2 w-2 rounded-full ${data.isRealtime ? "bg-[#38B449]" : "bg-[#98A2B3]"
+                                }`}
+                        />
+                        <span>{data.isRealtime ? "Real-Time" : "Offline"}</span>
                     </div>
                 </div>
 
-                {summaryCards.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {summaryCards.map(({ key, ...card }) => (
-                            <DashboardStatCard key={key} {...card} />
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <SummaryCard
+                        title="บัตรทั้งหมด"
+                        value={formatNumber(data.summaryCards.totalTickets)}
+                        suffix="tickets"
+                        note="↗ Today’s Total"
+                        icon={<Ticket size={16} strokeWidth={2.2} />}
+                    />
+
+                    <SummaryCard
+                        title="ชำระเงินแล้ว"
+                        value={formatNumber(data.summaryCards.paidCount)}
+                        note={`฿ ${formatNumber(data.summaryCards.paidRevenue)}.00 Total`}
+                        icon={<BadgeCheck size={16} strokeWidth={2.2} />}
+                    />
+
+                    <SummaryCard
+                        title="บิลค้างชำระ"
+                        value={formatNumber(data.summaryCards.pendingCount)}
+                        suffix="pending"
+                        note={``}
+                        icon={<Clock3 size={16} strokeWidth={2.2} />}
+                    />
+                </div>
+
+                <div className="mt-10">
+                    <h2 className="text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[#1F2937] md:text-[32px]">
+                        การชำระค่าบริการ
+                    </h2>
+                    <p className="mt-2 text-[12px] font-medium leading-[18px] text-[#6B7280]">
+                        • ช่องทางการชำระค่าบริการ
+                    </p>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                        {data.revenueGroups.map((group) => (
+                            <RevenueGroupCard
+                                key={group.id}
+                                title={group.label}
+                                description={getRevenueDescription(group)}
+                                amountText={formatCurrency(group.amount)}
+                                percent={group.percent}
+                                icon={getChannelIcon(group.id === "staff" ? "user" : "qr")}
+                            />
                         ))}
                     </div>
-                ) : null}
+                </div>
 
-                {serviceCards.length > 0 ? (
-                    <div className="mt-8">
-                        <DashboardSectionTitle
-                            title="การชำระค่าบริการ"
-                            description="ช่องทางการชำระค่าบริการ"
-                        />
+                <div className="mt-10">
+                    <h2 className="text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[#1F2937] md:text-[32px]">
+                        ยอดชำระค่าบริการแต่ละช่องทาง
+                    </h2>
+                    <p className="mt-2 text-[12px] font-medium leading-[18px] text-[#6B7280]">
+                        • ติดตามปริมาณการใช้งานในแต่ละช่องทางบริการ
+                    </p>
 
-                        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                            {serviceCards.map(({ key, ...card }) => (
-                                <DashboardProgressCard key={key} {...card} />
-                            ))}
-                        </div>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {data.channelBreakdown.map((channel) => (
+                            <ChannelCard
+                                key={channel.code}
+                                title={channel.label}
+                                subTitle={channel.subLabel}
+                                countText={`${channel.count} รายการ`}
+                                amountText={formatCurrency(channel.amount)}
+                                percent={channel.percent}
+                                icon={getChannelIcon(channel.icon)}
+                            />
+                        ))}
                     </div>
-                ) : null}
-
-                {channelCards.length > 0 ? (
-                    <div className="mt-8">
-                        <DashboardSectionTitle
-                            title="ยอดชำระค่าบริการแต่ละช่องทาง"
-                            description="ติดตามปริมาณการใช้งานแต่ละช่องทางบริการ"
-                        />
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            {channelCards.map(({ key, ...card }) => (
-                                <DashboardProgressCard key={key} {...card} compact />
-                            ))}
-                        </div>
-                    </div>
-                ) : null}
+                </div>
             </div>
         </section>
     );

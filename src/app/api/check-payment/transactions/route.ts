@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
     try {
-        const baseUrl = process.env.BaseURL;
+        const baseUrl = process.env.BASE_URL;
 
         if (!baseUrl) {
             return NextResponse.json(
@@ -12,9 +12,8 @@ export async function GET(req: NextRequest) {
         }
 
         const authorization = req.headers.get("authorization");
-        const search = req.nextUrl.search;
 
-        const res = await fetch(`${baseUrl}/api/v1/transactions${search}`, {
+        const response = await fetch(`${baseUrl}/api/v1/transactions`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -23,12 +22,14 @@ export async function GET(req: NextRequest) {
             cache: "no-store",
         });
 
-        const data = await res.json().catch(() => null);
+        const data = await response.json().catch(() => null);
 
-        return NextResponse.json(data, { status: res.status });
+        return NextResponse.json(data, {
+            status: response.status,
+        });
     } catch {
         return NextResponse.json(
-            { ok: false, message: "Fetch transactions failed" },
+            { ok: false, message: "Dashboard fetch failed" },
             { status: 500 }
         );
     }

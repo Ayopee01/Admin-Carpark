@@ -22,9 +22,9 @@ const menuItems = [
   { label: "Dashboard", href: "/landing/dashboard", icon: LuLayoutDashboard },
   { label: "ตรวจสอบ", href: "/landing/check-payment", icon: LuSearch },
   { label: "ยอดรวมทั้งหมด", href: "/landing/summary", icon: LuWalletCards },
-  { label: "การตั้งค่าสมาชิก", href: "/landing/setting_admin", icon: LuUsers },
-  { label: "ตั้งค่าอุปกรณ์", href: "/landing/setting_device", icon: LuSlidersHorizontal },
-  { label: "ตั้งค่าระบบ", href: "/landing/setting_system", icon: LuSettings2 },
+  { label: "การตั้งค่าสมาชิก", href: "/landing/member", icon: LuUsers },
+  { label: "ตั้งค่าอุปกรณ์", href: "/landing/device", icon: LuSlidersHorizontal },
+  { label: "ตั้งค่าระบบ", href: "/landing/system", icon: LuSettings2 },
 ];
 
 function Sidebar() {
