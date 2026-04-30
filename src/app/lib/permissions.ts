@@ -1,5 +1,10 @@
 import type { PermissionKey, PermissionUser } from "@/src/app/type/auth/Permission";
 
+export type {
+    PermissionKey,
+    PermissionUser,
+};
+
 export function hasPermission(
     user: PermissionUser | null | undefined,
     permission?: PermissionKey
