@@ -82,7 +82,9 @@ function PricingPage() {
 
     const pricingRules = useMemo(() => {
         if (!config) return [];
-        return [...config.pricingRules].sort((a, b) => a.hourStart - b.hourStart);
+        return [...config.pricingRules]
+            .filter((rule) => rule.vehicleType === "car")
+            .sort((a, b) => a.hourStart - b.hourStart);
     }, [config]);
 
     function getServiceLabel(code: string) {
@@ -98,7 +100,7 @@ function PricingPage() {
         setForm({
             ...DEFAULT_FORM,
             serviceType: config?.masterData.serviceTypes[0]?.code ?? "parking",
-            vehicleType: config?.masterData.vehicleTypes[0]?.code ?? "car",
+            vehicleType: "car",
         });
         setOpenModal(true);
     }
@@ -108,7 +110,7 @@ function PricingPage() {
         setEditingId(rule.id);
         setForm({
             serviceType: rule.serviceType,
-            vehicleType: rule.vehicleType,
+            vehicleType: "car",
             hourStart: rule.hourStart,
             hourEnd: rule.hourEnd,
             price: rule.price,
@@ -129,13 +131,18 @@ function PricingPage() {
                     ? `/api/devices/pricing/rules/${editingId}`
                     : "/api/devices/pricing/rules";
 
+            const payload: PricingRulePayload = {
+                ...form,
+                vehicleType: "car",
+            };
+
             const response = await fetch(url, {
                 method: modalMode === "edit" ? "PATCH" : "POST",
                 headers: {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             const result = await response.json().catch(() => null);
@@ -223,19 +230,24 @@ function PricingPage() {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {pricingRules.map((rule, index) => (
+                                {pricingRules.map((rule) => (
                                     <article
                                         key={rule.id}
-                                        className="flex min-h-[96px] items-center justify-between rounded-md border border-[#061D36] bg-white px-8"
+                                        className="flex min-h-[120px] items-center justify-between rounded-md border border-[#061D36] bg-white px-8 py-6"
                                     >
                                         <div>
-                                            <p className="text-[20px] font-bold text-[#061D36]">
-                                                ชั่วโมง {index + 1} :{" "}
-                                                <span className="text-[#16C75F]">{rule.price} บาท</span>
-                                            </p>
-                                            <p className="mt-2 text-[13px] text-[#1F2937]">
+                                            <p className="text-[16px] text-[#1F2937]">
                                                 ราคาสำหรับ {rule.hourStart} ถึง {rule.hourEnd} ชั่วโมง •{" "}
                                                 {getServiceLabel(rule.serviceType)}
+                                            </p>
+
+                                            <p className="mt-3 text-[30px] font-bold text-[#061D36]">
+                                                <span className="text-[#061D36]">
+                                                    ช่วงที่ {rule.hourStart} :
+                                                </span>{" "}
+                                                <span className="text-[#16C75F]">
+                                                    {rule.price} บาท
+                                                </span>
                                             </p>
                                         </div>
 

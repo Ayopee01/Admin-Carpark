@@ -3,10 +3,18 @@
 import type { OverviewUsageChartItem } from "@/src/app/type/summary/summary";
 
 type Props = {
+    title?: string;
+    description?: string;
+    badgeLabel?: string;
     items: OverviewUsageChartItem[];
 };
 
-function UsageChartCard({ items }: Props) {
+function UsageChartCard({
+    title = "สถิติการใช้งานของผู้ใช้",
+    description = "ข้อมูลแสดงจำนวนผู้ใช้งานบริการ (ชม.) รายสัปดาห์",
+    badgeLabel = "มีการใช้",
+    items,
+}: Props) {
     const width = 640;
     const height = 260;
     const paddingLeft = 30;
@@ -22,10 +30,14 @@ function UsageChartCard({ items }: Props) {
     const points = items.map((item, index) => {
         const x =
             paddingLeft +
-            (items.length === 1 ? innerWidth / 2 : (index * innerWidth) / (items.length - 1));
+            (items.length === 1
+                ? innerWidth / 2
+                : (index * innerWidth) / (items.length - 1));
 
         const y =
-            paddingTop + innerHeight - (item.value / maxValue) * (innerHeight - 12);
+            paddingTop +
+            innerHeight -
+            (item.value / maxValue) * (innerHeight - 12);
 
         return {
             ...item,
@@ -34,23 +46,26 @@ function UsageChartCard({ items }: Props) {
         };
     });
 
-    const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
+    const polylinePoints = points
+        .map((point) => `${point.x},${point.y}`)
+        .join(" ");
 
     return (
         <article className="rounded-[18px] border border-[#E5E7EB] bg-white p-5 md:p-6">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h3 className="text-[18px] font-bold text-[#1F2937]">
-                        สถิติการใช้งานของผู้ใช้
+                        {title}
                     </h3>
+
                     <p className="mt-1 text-[12px] text-[#667085]">
-                        ข้อมูลแสดงจำนวนผู้ใช้งานบริการ (ชม.) รายสัปดาห์
+                        {description}
                     </p>
                 </div>
 
                 <div className="inline-flex items-center gap-2 text-[12px] font-medium text-[#667085]">
                     <span className="h-2 w-2 rounded-full bg-[#22C55E]" />
-                    มีการใช้
+                    {badgeLabel}
                 </div>
             </div>
 
@@ -93,7 +108,12 @@ function UsageChartCard({ items }: Props) {
 
                             {points.map((point) => (
                                 <g key={point.label}>
-                                    <circle cx={point.x} cy={point.y} r="4.5" fill="#8EC0F4" />
+                                    <circle
+                                        cx={point.x}
+                                        cy={point.y}
+                                        r="4.5"
+                                        fill="#8EC0F4"
+                                    />
 
                                     <text
                                         x={point.x}

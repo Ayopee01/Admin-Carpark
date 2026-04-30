@@ -33,6 +33,23 @@ function formatDateParam(date?: Date) {
     return `${year}-${month}-${day}`;
 }
 
+function getDateRangeParams(range?: DateRange) {
+    if (!range?.from) {
+        return {
+            startDate: "",
+            endDate: "",
+        };
+    }
+
+    const startDate = formatDateParam(range.from);
+    const endDate = formatDateParam(range.to ?? range.from);
+
+    return {
+        startDate,
+        endDate,
+    };
+}
+
 function SummaryPage() {
     const [data, setData] = useState<OverviewSummaryResponse | null>(null);
     const [loading, setLoading] = useState(true);
@@ -41,15 +58,10 @@ function SummaryPage() {
 
     const [selectedRange, setSelectedRange] = useState<DateRange | undefined>();
 
-    const selectedStartDate =
-        selectedRange?.from && selectedRange?.to
-            ? formatDateParam(selectedRange.from)
-            : "";
-
-    const selectedEndDate =
-        selectedRange?.from && selectedRange?.to
-            ? formatDateParam(selectedRange.to)
-            : "";
+    const { startDate: selectedStartDate, endDate: selectedEndDate } = useMemo(
+        () => getDateRangeParams(selectedRange),
+        [selectedRange]
+    );
 
     useEffect(() => {
         let ignore = false;
@@ -62,18 +74,16 @@ function SummaryPage() {
                 setError("");
 
                 const token =
-                    typeof window !== "undefined"
-                        ? localStorage.getItem("token")
-                        : null;
+                    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
                 const query = new URLSearchParams();
 
                 if (selectedStartDate) {
-                    query.set("startDate", selectedStartDate);
+                    query.set("start_date", selectedStartDate);
                 }
 
                 if (selectedEndDate) {
-                    query.set("endDate", selectedEndDate);
+                    query.set("end_date", selectedEndDate);
                 }
 
                 if (!ignore) {
@@ -85,6 +95,7 @@ function SummaryPage() {
                     {
                         method: "GET",
                         headers: {
+                            Accept: "application/json",
                             ...(token ? { Authorization: `Bearer ${token}` } : {}),
                         },
                         cache: "no-store",
@@ -102,9 +113,7 @@ function SummaryPage() {
                 }
 
                 if (!response.ok) {
-                    throw new Error(
-                        result?.message || "ไม่สามารถดึงข้อมูลภาพรวมได้"
-                    );
+                    throw new Error(result?.message || "ไม่สามารถดึงข้อมูลภาพรวมได้");
                 }
 
                 if (!ignore) {
@@ -132,7 +141,7 @@ function SummaryPage() {
             }
         }
 
-        fetchOverviewSummary();
+        void fetchOverviewSummary();
 
         return () => {
             ignore = true;
@@ -184,7 +193,7 @@ function SummaryPage() {
         () => (
             <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
                 <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-                <span>Real-Time</span>
+                <span>Online</span>
             </div>
         ),
         []
@@ -240,10 +249,7 @@ function SummaryPage() {
                 </div>
 
                 <div className="mb-5">
-                    <DateRangeFilter
-                        value={selectedRange}
-                        onChange={setSelectedRange}
-                    />
+                    <DateRangeFilter value={selectedRange} onChange={setSelectedRange} />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -251,16 +257,14 @@ function SummaryPage() {
                         title="บัตรทั้งหมด"
                         value={formatNumber(data.summaryCards.totalTickets)}
                         suffix="tickets"
-                        note="↗ Today’s Total"
+                        note="↗ Total"
                         icon={<LuTicket size={16} />}
                     />
 
                     <SummaryCard
                         title="ชำระเงินแล้ว"
                         value={formatNumber(data.summaryCards.paidCount)}
-                        note={`฿ ${formatNumber(
-                            data.summaryCards.paidRevenue
-                        )}.00 Total`}
+                        note={`฿ ${formatNumber(data.summaryCards.paidRevenue)}.00 Total`}
                         icon={<LuCircleDollarSign size={16} />}
                     />
 
@@ -302,7 +306,13 @@ function SummaryPage() {
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                    <UsageChartCard items={data.usageChart} />
+                    <UsageChartCard
+                        title="สถิติการใช้งานของผู้ใช้"
+                        description={`ข้อมูลแสดงจำนวนผู้เข้าใช้บริการ (${data.usageChartLabel ?? "รายวัน"})`}
+                        badgeLabel={data.usageChartLabel ?? "รายวัน"}
+                        items={data.usageChart}
+                    />
+
                     <ServiceSummaryCard
                         items={data.serviceSummary}
                         totalAmount={data.totalSummaryCalculated}

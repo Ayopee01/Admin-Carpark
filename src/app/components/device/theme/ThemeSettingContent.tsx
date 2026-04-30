@@ -2,52 +2,46 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import type {
-    ThemeConfig,
-    ThemePayload,
-    ThemeUploadLogoResponse,
-} from "@/src/app/type/device/theme";
 
-const DEFAULT_THEME: ThemeConfig = {
-    themeName: "default",
-    primaryColor: "#1D4ED8",
-    secondaryColor: "#0F172A",
-    accentColor: "#22C55E",
-    logoUrl: null,
-    updatedAt: "",
-};
+type PresetKey = "preset1" | "preset2" | "preset3" | "preset4";
 
 type ThemePreset = {
-    name: string;
-    themeName: string;
-    primaryColor: string;
-    secondaryColor: string;
-    accentColor: string;
+    themeColor: string;
 };
 
-const FRONTEND_THEME_PRESETS: ThemePreset[] = [
-    {
-        name: "Dark",
-        themeName: "dark",
-        primaryColor: "#0F172A",
-        secondaryColor: "#1E293B",
-        accentColor: "#22C55E",
-    },
-    {
-        name: "Blue",
-        themeName: "blue",
-        primaryColor: "#1D4ED8",
-        secondaryColor: "#0F172A",
-        accentColor: "#38BDF8",
-    },
-    {
-        name: "Green",
-        themeName: "green",
-        primaryColor: "#16A34A",
-        secondaryColor: "#14532D",
-        accentColor: "#FACC15",
-    },
-];
+type ThemePresets = Record<PresetKey, ThemePreset>;
+
+type ThemeApiConfig = {
+    themeColor: string;
+    logoUrl: string | null;
+    themeName?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    updatedAt?: string;
+    method?: string;
+    action?: string;
+    presets: ThemePresets;
+};
+
+type ThemePutPayload = {
+    themeColor: string;
+    logoUrl: string | null;
+    presets: {
+        preset4: {
+            themeColor: string;
+        };
+    };
+};
+
+type ColorOption = {
+    key: PresetKey;
+    title: string;
+    subtitle: string;
+    color: string;
+};
+
+const THEME_API_PATH = "/api/devices/theme";
 
 function getToken() {
     return typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -70,74 +64,224 @@ function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
-function getThemeFromResult(result: unknown): Partial<ThemeConfig> | null {
+function getThemeFromResult(result: unknown): Partial<ThemeApiConfig> | null {
     if (!isObject(result)) return null;
 
     if (isObject(result.theme)) {
-        return result.theme as Partial<ThemeConfig>;
+        return result.theme as Partial<ThemeApiConfig>;
     }
 
-    return result as Partial<ThemeConfig>;
+    return result as Partial<ThemeApiConfig>;
 }
 
-function normalizeTheme(value?: Partial<ThemeConfig> | null): ThemeConfig {
+function isHexColor(value: string) {
+    return /^#[0-9A-F]{6}$/i.test(value);
+}
+
+function normalizeHexInput(value: string) {
+    const cleaned = value.trim().replace(/[^#0-9a-fA-F]/g, "");
+    const withoutHash = cleaned.startsWith("#") ? cleaned.slice(1) : cleaned;
+
+    return `#${withoutHash.slice(0, 6).toUpperCase()}`;
+}
+
+function normalizeTheme(value?: Partial<ThemeApiConfig> | null): ThemeApiConfig {
+    if (!value?.themeColor || !isHexColor(value.themeColor)) {
+        throw new Error("ข้อมูล themeColor จาก API ไม่ถูกต้อง");
+    }
+
+    if (!value.presets || !isObject(value.presets)) {
+        throw new Error("ข้อมูล presets จาก API ไม่ครบ");
+    }
+
+    const preset1 = value.presets.preset1?.themeColor;
+    const preset2 = value.presets.preset2?.themeColor;
+    const preset3 = value.presets.preset3?.themeColor;
+    const preset4 = value.presets.preset4?.themeColor;
+
+    if (
+        !isHexColor(preset1 ?? "") ||
+        !isHexColor(preset2 ?? "") ||
+        !isHexColor(preset3 ?? "") ||
+        !isHexColor(preset4 ?? "")
+    ) {
+        throw new Error("ค่าสีใน presets จาก API ไม่ถูกต้อง");
+    }
+
     return {
-        themeName: value?.themeName ?? DEFAULT_THEME.themeName,
-        primaryColor: value?.primaryColor ?? DEFAULT_THEME.primaryColor,
-        secondaryColor: value?.secondaryColor ?? DEFAULT_THEME.secondaryColor,
-        accentColor: value?.accentColor ?? DEFAULT_THEME.accentColor,
-        logoUrl: value?.logoUrl ?? null,
-        updatedAt: value?.updatedAt ?? "",
+        themeColor: value.themeColor,
+        logoUrl: typeof value.logoUrl === "string" ? value.logoUrl : null,
+        themeName: value.themeName,
+        primaryColor: value.primaryColor,
+        secondaryColor: value.secondaryColor,
+        accentColor: value.accentColor,
+        updatedAt: value.updatedAt,
+        method: value.method,
+        action: value.action,
+        presets: {
+            preset1: {
+                themeColor: preset1 as string,
+            },
+            preset2: {
+                themeColor: preset2 as string,
+            },
+            preset3: {
+                themeColor: preset3 as string,
+            },
+            preset4: {
+                themeColor: preset4 as string,
+            },
+        },
     };
 }
 
-function toThemePayload(theme: ThemeConfig): ThemePayload {
+function toThemePutPayload(theme: ThemeApiConfig, customColor: string): ThemePutPayload {
     return {
-        themeName: theme.themeName,
-        primaryColor: theme.primaryColor,
-        secondaryColor: theme.secondaryColor,
-        accentColor: theme.accentColor,
+        themeColor: theme.themeColor,
         logoUrl: theme.logoUrl,
+        presets: {
+            preset4: {
+                themeColor: customColor,
+            },
+        },
     };
 }
 
-function getUploadedLogoUrl(result: ThemeUploadLogoResponse | null) {
+function getUploadedLogoUrl(result: unknown) {
+    if (!isObject(result)) return null;
+
+    if (typeof result.logoUrl === "string") return result.logoUrl;
+    if (typeof result.url === "string") return result.url;
+
+    if (isObject(result.data)) {
+        if (typeof result.data.logoUrl === "string") return result.data.logoUrl;
+        if (typeof result.data.url === "string") return result.data.url;
+    }
+
+    if (isObject(result.theme) && typeof result.theme.logoUrl === "string") {
+        return result.theme.logoUrl;
+    }
+
+    return null;
+}
+
+function getActivePresetKey(theme: ThemeApiConfig): PresetKey {
+    const matchedPreset = Object.entries(theme.presets).find(
+        ([, preset]) =>
+            preset.themeColor.toLowerCase() === theme.themeColor.toLowerCase()
+    );
+
+    return (matchedPreset?.[0] as PresetKey | undefined) ?? "preset1";
+}
+
+function applyThemeColorToRoot(themeColor: string) {
+    if (typeof document === "undefined") return;
+    if (!isHexColor(themeColor)) return;
+
+    const root = document.documentElement;
+
+    root.style.setProperty("--theme", themeColor);
+    root.style.setProperty("--keyboard-confirm", themeColor);
+}
+
+type ThemeOptionCardProps = {
+    title: string;
+    subtitle: string;
+    color: string;
+    active: boolean;
+    onClick: () => void;
+};
+
+function ThemeOptionCard({
+    title,
+    subtitle,
+    color,
+    active,
+    onClick,
+}: ThemeOptionCardProps) {
     return (
-        result?.logoUrl ??
-        result?.url ??
-        result?.data?.logoUrl ??
-        result?.data?.url ??
-        result?.theme?.logoUrl ??
-        null
+        <button
+            type="button"
+            onClick={onClick}
+            className={`min-h-[108px] rounded-[14px] border bg-[#E9EEF3] px-4 py-3 text-left transition ${active
+                    ? "border-[#0D1B2A] shadow-[0_0_0_1px_#0D1B2A]"
+                    : "border-transparent hover:border-[#CBD5E1]"
+                }`}
+        >
+            <div className="flex items-start justify-between gap-2">
+                <div
+                    className="h-7 w-[84px] rounded-[4px] border border-white/80 shadow-sm"
+                    style={{ backgroundColor: color }}
+                />
+
+                {active ? (
+                    <span className="rounded-md bg-[#DCE6F2] px-2 py-1 text-[10px] font-bold text-[#4B5563]">
+                        ใช้งานอยู่
+                    </span>
+                ) : null}
+            </div>
+
+            <div className="mt-4 text-[14px] font-extrabold text-[#2B3640]">
+                {title}
+            </div>
+
+            <div className="mt-1 text-[12px] font-semibold text-[#6B7280]">
+                {subtitle}
+            </div>
+        </button>
     );
 }
 
-function ThemeColorField({
-    label,
-    value,
-    onChange,
-}: {
-    label: string;
+type CustomColorEditorProps = {
     value: string;
     onChange: (value: string) => void;
-}) {
+};
+
+function CustomColorEditor({ value, onChange }: CustomColorEditorProps) {
+    const safeColor = isHexColor(value) ? value : "#000000";
+
+    function handleChange(nextValue: string) {
+        onChange(normalizeHexInput(nextValue));
+    }
+
     return (
-        <div className="rounded-xl bg-[#E6EEF4] p-4">
-            <div className="text-[12px] font-semibold text-[#667085]">{label}</div>
+        <div className="rounded-[24px] border border-[#D8DEE5] bg-white p-6">
+            <div className="mb-6 text-center text-[18px] font-extrabold text-[#2B3640] md:text-[20px]">
+                เลือกสีหลัก 1 สี
+            </div>
 
-            <div className="mt-3 flex items-center gap-3">
-                <input
-                    type="color"
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    className="h-10 w-10 cursor-pointer rounded border-none bg-transparent p-0"
-                />
+            <div className="rounded-[16px] bg-[#E9EEF3] p-4">
+                <div className="text-[12px] font-semibold text-[#667085]">
+                    สี Custom ของ Preset 4
+                </div>
 
-                <input
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    className="h-10 flex-1 rounded-md border border-[#D0D5DD] bg-white px-3 text-[14px] font-medium text-[#1F2937] outline-none"
-                />
+                <div className="mt-3 flex items-center gap-3">
+                    <input
+                        type="color"
+                        value={safeColor}
+                        onChange={(event) =>
+                            handleChange(event.target.value.toUpperCase())
+                        }
+                        className="h-11 w-11 shrink-0 cursor-pointer rounded-[6px] border border-white bg-transparent p-0 shadow-sm"
+                        aria-label="เลือกสี Custom"
+                    />
+
+                    <input
+                        value={value}
+                        onChange={(event) => handleChange(event.target.value)}
+                        placeholder="#000000"
+                        className={`h-11 flex-1 rounded-[10px] border bg-white px-4 text-[15px] font-semibold outline-none ${isHexColor(value)
+                                ? "border-[#D0D5DD] text-[#1F2937]"
+                                : "border-red-300 text-red-600"
+                            }`}
+                    />
+                </div>
+
+                {!isHexColor(value) ? (
+                    <div className="mt-3 text-[12px] font-semibold text-red-500">
+                        กรุณากรอกค่าสีแบบ HEX เช่น #000000
+                    </div>
+                ) : null}
             </div>
         </div>
     );
@@ -146,8 +290,13 @@ function ThemeColorField({
 function ThemeSettingContent() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [theme, setTheme] = useState<ThemeConfig>(DEFAULT_THEME);
-    const [draft, setDraft] = useState<ThemeConfig>(DEFAULT_THEME);
+    const [theme, setTheme] = useState<ThemeApiConfig | null>(null);
+    const [draft, setDraft] = useState<ThemeApiConfig | null>(null);
+
+    const [selectedPresetKey, setSelectedPresetKey] =
+        useState<PresetKey>("preset1");
+    const [customColor, setCustomColor] = useState("");
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -162,7 +311,7 @@ function ThemeSettingContent() {
 
             const token = getToken();
 
-            const response = await fetch("/api/devices/theme", {
+            const response = await fetch(THEME_API_PATH, {
                 method: "GET",
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -177,9 +326,13 @@ function ThemeSettingContent() {
             }
 
             const nextTheme = normalizeTheme(getThemeFromResult(result));
+            const activePresetKey = getActivePresetKey(nextTheme);
 
             setTheme(nextTheme);
             setDraft(nextTheme);
+            setSelectedPresetKey(activePresetKey);
+            setCustomColor(nextTheme.presets.preset4.themeColor);
+            applyThemeColorToRoot(nextTheme.themeColor);
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         } finally {
@@ -191,21 +344,105 @@ function ThemeSettingContent() {
         fetchTheme();
     }, []);
 
+    const colorOptions = useMemo<ColorOption[]>(() => {
+        if (!draft) return [];
+
+        return [
+            {
+                key: "preset1",
+                title: "ธีม 01",
+                subtitle: draft.presets.preset1.themeColor,
+                color: draft.presets.preset1.themeColor,
+            },
+            {
+                key: "preset2",
+                title: "ธีม 02",
+                subtitle: draft.presets.preset2.themeColor,
+                color: draft.presets.preset2.themeColor,
+            },
+            {
+                key: "preset3",
+                title: "ธีม 03",
+                subtitle: draft.presets.preset3.themeColor,
+                color: draft.presets.preset3.themeColor,
+            },
+            {
+                key: "preset4",
+                title: "Custom",
+                subtitle: draft.presets.preset4.themeColor,
+                color: draft.presets.preset4.themeColor,
+            },
+        ];
+    }, [draft]);
+
+    function handleSelectPreset(key: PresetKey) {
+        if (!draft) return;
+
+        const nextColor = draft.presets[key].themeColor;
+
+        setSelectedPresetKey(key);
+        setError("");
+        setSuccess("");
+
+        setDraft({
+            ...draft,
+            themeColor: nextColor,
+        });
+
+        if (key === "preset4") {
+            setCustomColor(nextColor);
+        }
+
+        applyThemeColorToRoot(nextColor);
+    }
+
+    function handleCustomColorChange(value: string) {
+        if (!draft) return;
+
+        setCustomColor(value);
+        setSelectedPresetKey("preset4");
+        setError("");
+        setSuccess("");
+
+        if (isHexColor(value)) {
+            setDraft({
+                ...draft,
+                themeColor: value,
+                presets: {
+                    ...draft.presets,
+                    preset4: {
+                        themeColor: value,
+                    },
+                },
+            });
+
+            applyThemeColorToRoot(value);
+        }
+    }
+
     async function handleSave() {
+        if (!draft) return;
+
+        if (!isHexColor(customColor)) {
+            setError("กรุณาระบุค่าสี Custom ของ Preset 4 ให้ถูกต้อง เช่น #000000");
+            return;
+        }
+
         try {
             setSaving(true);
             setError("");
             setSuccess("");
 
             const token = getToken();
+            const payload = toThemePutPayload(draft, customColor);
 
-            const response = await fetch("/api/devices/theme", {
+            const response = await fetch(THEME_API_PATH, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },
-                body: JSON.stringify(toThemePayload(draft)),
+                body: JSON.stringify(payload),
             });
 
             const result: unknown = await response.json().catch(() => null);
@@ -215,9 +452,13 @@ function ThemeSettingContent() {
             }
 
             const updatedTheme = normalizeTheme(getThemeFromResult(result) ?? draft);
+            const activePresetKey = getActivePresetKey(updatedTheme);
 
             setTheme(updatedTheme);
             setDraft(updatedTheme);
+            setSelectedPresetKey(activePresetKey);
+            setCustomColor(updatedTheme.presets.preset4.themeColor);
+            applyThemeColorToRoot(updatedTheme.themeColor);
             setSuccess("บันทึกธีมสำเร็จ");
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -227,23 +468,16 @@ function ThemeSettingContent() {
     }
 
     function handleCancel() {
+        if (!theme) return;
+
+        const activePresetKey = getActivePresetKey(theme);
+
         setDraft(theme);
+        setSelectedPresetKey(activePresetKey);
+        setCustomColor(theme.presets.preset4.themeColor);
         setError("");
         setSuccess("");
-    }
-
-    function handleSelectPreset(preset: ThemePreset) {
-        setDraft((prev) => ({
-            ...prev,
-            themeName: preset.themeName,
-            primaryColor: preset.primaryColor,
-            secondaryColor: preset.secondaryColor,
-            accentColor: preset.accentColor,
-        }));
-    }
-
-    function handleSelectDefaultTheme() {
-        setDraft(theme);
+        applyThemeColorToRoot(theme.themeColor);
     }
 
     async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -268,7 +502,7 @@ function ThemeSettingContent() {
 
             formData.append("logo", file);
 
-            const response = await fetch("/api/devices/theme/upload-logo", {
+            const response = await fetch(`${THEME_API_PATH}/upload-logo`, {
                 method: "POST",
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -276,9 +510,7 @@ function ThemeSettingContent() {
                 body: formData,
             });
 
-            const result: ThemeUploadLogoResponse | null = await response
-                .json()
-                .catch(() => null);
+            const result: unknown = await response.json().catch(() => null);
 
             if (!response.ok) {
                 throw new Error(getErrorMessage(result, "อัปโหลดโลโก้ไม่สำเร็จ"));
@@ -290,19 +522,16 @@ function ThemeSettingContent() {
                 throw new Error("อัปโหลดสำเร็จ แต่ไม่พบ logoUrl จาก API");
             }
 
-            if (result?.theme) {
-                const nextTheme = normalizeTheme(result.theme);
+            setDraft((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        logoUrl,
+                    }
+                    : prev
+            );
 
-                setTheme(nextTheme);
-                setDraft(nextTheme);
-            } else {
-                setDraft((prev) => ({
-                    ...prev,
-                    logoUrl,
-                }));
-            }
-
-            setSuccess("อัปโหลดโลโก้สำเร็จ");
+            setSuccess("อัปโหลดโลโก้แล้ว กดบันทึกเพื่อยืนยัน");
         } catch (err) {
             setError(err instanceof Error ? err.message : "อัปโหลดโลโก้ไม่สำเร็จ");
         } finally {
@@ -311,35 +540,18 @@ function ThemeSettingContent() {
     }
 
     function handleRemoveLogo() {
-        setDraft((prev) => ({
-            ...prev,
-            logoUrl: null,
-        }));
-        setError("");
-        setSuccess("");
-    }
+        setDraft((prev) =>
+            prev
+                ? {
+                    ...prev,
+                    logoUrl: null,
+                }
+                : prev
+        );
 
-    const themeCards = useMemo(
-        () => [
-            {
-                name: "Default",
-                themeName: theme.themeName,
-                primaryColor: theme.primaryColor,
-                secondaryColor: theme.secondaryColor,
-                accentColor: theme.accentColor,
-                isDefaultFromApi: true,
-            },
-            ...FRONTEND_THEME_PRESETS.map((preset) => ({
-                name: preset.name,
-                themeName: preset.themeName,
-                primaryColor: preset.primaryColor,
-                secondaryColor: preset.secondaryColor,
-                accentColor: preset.accentColor,
-                isDefaultFromApi: false,
-            })),
-        ],
-        [theme]
-    );
+        setError("");
+        setSuccess("ลบโลโก้ในแบบร่างแล้ว กดบันทึกเพื่อยืนยัน");
+    }
 
     if (loading) {
         return (
@@ -349,11 +561,19 @@ function ThemeSettingContent() {
                     การตั้งค่าธีม
                 </h2>
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
                     <div className="min-h-[360px] animate-pulse rounded-2xl bg-[#E4E6E8]" />
                     <div className="min-h-[360px] animate-pulse rounded-[24px] bg-[#E4E6E8]" />
                 </div>
             </>
+        );
+    }
+
+    if (!theme || !draft) {
+        return (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                ไม่พบข้อมูลธีมจาก API
+            </div>
         );
     }
 
@@ -376,166 +596,92 @@ function ThemeSettingContent() {
                 </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="rounded-2xl bg-[#F8F8F8] p-6">
                     <div className="text-[18px] font-extrabold text-[#2B3640]">
                         ธีมที่มีอยู่
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-4">
-                        {themeCards.map((item) => {
-                            const isActive =
-                                draft.themeName === item.themeName &&
-                                draft.primaryColor === item.primaryColor &&
-                                draft.secondaryColor === item.secondaryColor &&
-                                draft.accentColor === item.accentColor;
-
-                            return (
-                                <button
-                                    key={`${item.name}-${item.themeName}`}
-                                    type="button"
-                                    onClick={() =>
-                                        item.isDefaultFromApi
-                                            ? handleSelectDefaultTheme()
-                                            : handleSelectPreset({
-                                                name: item.name,
-                                                themeName: item.themeName,
-                                                primaryColor: item.primaryColor,
-                                                secondaryColor: item.secondaryColor,
-                                                accentColor: item.accentColor,
-                                            })
-                                    }
-                                    className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${isActive
-                                            ? "border-[#0D1B2A] bg-white shadow-sm"
-                                            : "border-transparent bg-[#E9EAEC]"
-                                        }`}
-                                >
-                                    <div className="flex gap-2">
-                                        <span
-                                            className="h-8 w-8 rounded"
-                                            style={{ backgroundColor: item.primaryColor }}
-                                        />
-                                        <span
-                                            className="h-8 w-8 rounded"
-                                            style={{ backgroundColor: item.secondaryColor }}
-                                        />
-                                        <span
-                                            className="h-8 w-8 rounded"
-                                            style={{ backgroundColor: item.accentColor }}
-                                        />
-                                    </div>
-
-                                    <div className="mt-3 text-[13px] font-semibold">
-                                        {item.name}
-                                    </div>
-
-                                    {item.isDefaultFromApi ? (
-                                        <div className="mt-1 text-[11px] text-[#667085]">
-                                            จาก API
-                                        </div>
-                                    ) : null}
-                                </button>
-                            );
-                        })}
+                    <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {colorOptions.map((option) => (
+                            <ThemeOptionCard
+                                key={option.key}
+                                title={option.title}
+                                subtitle={option.subtitle}
+                                color={option.color}
+                                active={selectedPresetKey === option.key}
+                                onClick={() => handleSelectPreset(option.key)}
+                            />
+                        ))}
                     </div>
 
+                    {selectedPresetKey === "preset4" ? (
+                        <div className="mt-8">
+                            <CustomColorEditor
+                                value={customColor}
+                                onChange={handleCustomColorChange}
+                            />
+                        </div>
+                    ) : null}
+
                     <div className="mt-8 rounded-2xl border border-[#E0E2E6] bg-white p-6">
-                        <div className="mb-5 text-center text-[20px] font-extrabold text-[#2B3640]">
-                            ตั้งค่าชุดสีหลัก
+                        <div className="mb-5 text-[18px] font-extrabold text-[#2B3640]">
+                            โลโก้
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <ThemeColorField
-                                label="สีหลัก (PRIMARY)"
-                                value={draft.primaryColor}
-                                onChange={(value) =>
-                                    setDraft((prev) => ({
-                                        ...prev,
-                                        primaryColor: value,
-                                    }))
-                                }
-                            />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoUpload}
+                            className="hidden"
+                        />
 
-                            <ThemeColorField
-                                label="สีรอง (SECONDARY)"
-                                value={draft.secondaryColor}
-                                onChange={(value) =>
-                                    setDraft((prev) => ({
-                                        ...prev,
-                                        secondaryColor: value,
-                                    }))
-                                }
-                            />
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploadingLogo}
+                                className="h-10 rounded-md bg-[#0D1B2A] px-4 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {uploadingLogo ? "กำลังอัปโหลด..." : "อัปโหลดรูปภาพ"}
+                            </button>
 
-                            <ThemeColorField
-                                label="สีเน้น (ACCENT)"
-                                value={draft.accentColor}
-                                onChange={(value) =>
-                                    setDraft((prev) => ({
-                                        ...prev,
-                                        accentColor: value,
-                                    }))
-                                }
-                            />
+                            {draft.logoUrl ? (
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveLogo}
+                                    disabled={uploadingLogo}
+                                    className="h-10 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-semibold text-[#667085] transition hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    ลบโลโก้
+                                </button>
+                            ) : null}
+                        </div>
 
-                            <div className="rounded-xl bg-[#E6EEF4] p-4">
-                                <div className="text-[12px] font-semibold text-[#667085]">
-                                    LOGO
-                                </div>
-
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLogoUpload}
-                                    className="hidden"
+                        {draft.logoUrl ? (
+                            <div className="mt-4 rounded-lg border border-[#D0D5DD] bg-white p-3">
+                                <img
+                                    src={draft.logoUrl}
+                                    alt="Logo preview"
+                                    className="h-16 max-w-full object-contain"
                                 />
-
-                                <div className="mt-3 flex flex-wrap items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={uploadingLogo}
-                                        className="h-10 rounded-md bg-[#0D1B2A] px-4 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {uploadingLogo
-                                            ? "กำลังอัปโหลด..."
-                                            : "อัปโหลดรูปภาพ"}
-                                    </button>
-
-                                    {draft.logoUrl ? (
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveLogo}
-                                            disabled={uploadingLogo}
-                                            className="h-10 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-semibold text-[#667085] transition hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            ลบโลโก้
-                                        </button>
-                                    ) : null}
-                                </div>
-
-                                {draft.logoUrl ? (
-                                    <div className="mt-4 rounded-lg border border-[#D0D5DD] bg-white p-3">
-                                        <img
-                                            src={draft.logoUrl}
-                                            alt="Logo preview"
-                                            className="h-16 max-w-full object-contain"
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="mt-4 rounded-lg border border-dashed border-[#C7CDD5] bg-white px-3 py-5 text-center text-[12px] text-[#98A2B3]">
-                                        ยังไม่มีโลโก้
-                                    </div>
-                                )}
                             </div>
-                        </div>
+                        ) : (
+                            <div className="mt-4 rounded-lg border border-dashed border-[#C7CDD5] bg-white px-3 py-5 text-center text-[12px] text-[#98A2B3]">
+                                ยังไม่มีโลโก้
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="rounded-[24px] border border-[#667085] bg-[#F8F8F8] p-5">
                     <div className="text-[24px] font-extrabold text-[#2B3640]">
                         ตัวอย่าง
+                    </div>
+
+                    <div className="mt-2 text-[13px] font-semibold text-[#667085]">
+                        สีที่เลือก: {draft.themeColor}
                     </div>
 
                     <div className="mt-5 rounded-xl bg-[#EFEFEF] p-4">
@@ -549,7 +695,7 @@ function ThemeSettingContent() {
                             ) : (
                                 <div
                                     className="mb-4 h-3 w-32 rounded-full"
-                                    style={{ backgroundColor: draft.accentColor }}
+                                    style={{ backgroundColor: draft.themeColor }}
                                 />
                             )}
 
@@ -558,11 +704,11 @@ function ThemeSettingContent() {
 
                             <div
                                 className="rounded-xl p-8"
-                                style={{ backgroundColor: `${draft.primaryColor}20` }}
+                                style={{ backgroundColor: `${draft.themeColor}20` }}
                             >
                                 <div
                                     className="mx-auto h-14 w-14 rounded-b-2xl border-[4px] border-t-0"
-                                    style={{ borderColor: draft.secondaryColor }}
+                                    style={{ borderColor: draft.themeColor }}
                                 />
                             </div>
                         </div>
@@ -570,18 +716,10 @@ function ThemeSettingContent() {
 
                     <button
                         type="button"
-                        style={{ backgroundColor: draft.primaryColor }}
+                        style={{ backgroundColor: draft.themeColor }}
                         className="mt-5 w-full rounded-xl px-4 py-4 text-[16px] font-bold text-white transition hover:opacity-90"
                     >
-                        ตัวอย่าง Primary
-                    </button>
-
-                    <button
-                        type="button"
-                        style={{ backgroundColor: draft.accentColor }}
-                        className="mt-3 w-full rounded-xl px-4 py-4 text-[16px] font-bold text-white transition hover:opacity-90"
-                    >
-                        ตัวอย่าง Accent
+                        ตัวอย่าง Theme
                     </button>
 
                     <div className="mt-4 flex gap-3">
@@ -589,7 +727,7 @@ function ThemeSettingContent() {
                             type="button"
                             onClick={handleSave}
                             disabled={saving || uploadingLogo}
-                            style={{ backgroundColor: draft.secondaryColor }}
+                            style={{ backgroundColor: draft.themeColor }}
                             className="flex-1 rounded-full px-4 py-3 text-[14px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {saving ? "กำลังบันทึก..." : "บันทึก"}

@@ -5,10 +5,18 @@ type SummaryCardProps = {
     value: string;
     suffix?: string;
     note: string;
+    noteIcon?: ReactNode;
     icon: ReactNode;
 };
 
-function SummaryCard({ title, value, suffix, note, icon }: SummaryCardProps) {
+function SummaryCard({
+    title,
+    value,
+    suffix,
+    note,
+    noteIcon,
+    icon,
+}: SummaryCardProps) {
     return (
         <article className="relative min-h-[138px] rounded-[8px] bg-[#E4E6E8] px-5 pb-4 pt-4 shadow-none">
             <div className="absolute inset-x-0 top-0 h-[4px] rounded-t-[8px] bg-[#1F2937]" />
@@ -35,8 +43,14 @@ function SummaryCard({ title, value, suffix, note, icon }: SummaryCardProps) {
                 ) : null}
             </div>
 
-            <p className="mt-4 text-[11px] font-semibold leading-[16px] text-[#111827]">
-                {note}
+            <p className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold leading-[16px] text-[#111827]">
+                {noteIcon ? (
+                    <span className="flex shrink-0 items-center justify-center">
+                        {noteIcon}
+                    </span>
+                ) : null}
+
+                <span>{note}</span>
             </p>
         </article>
     );

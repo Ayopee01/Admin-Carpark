@@ -3,45 +3,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  LuLayoutDashboard,
-  LuSearch,
-  LuWalletCards,
-  LuUsers,
-  LuSlidersHorizontal,
-  LuSettings2,
-  LuChevronLeft,
-  LuLogOut,
-  LuX,
-} from "react-icons/lu";
+// Icons
+import { LuLayoutDashboard, LuSearch, LuWalletCards, LuUsers, LuSlidersHorizontal, LuSettings2, LuChevronLeft, LuLogOut, LuX } from "react-icons/lu";
 import { FaParking } from "react-icons/fa";
 import { FiUser } from "react-icons/fi";
-import type { MeResponse } from "@/src/app/type/auth/me";
+// Types
+import type { PermissionKey, SidebarUser, SidebarMenuItem } from "@/src/app/type/auth/Permission";
 
-type PermissionKey =
-  | "dashboard"
-  | "transactions"
-  | "overview"
-  | "pricing"
-  | "devices"
-  | "theme"
-  | "settings";
-
-type SidebarUser = MeResponse & {
-  role?: string | null;
-  permissions?: string[] | null;
-};
-
-type SidebarMenuItem = {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ size?: number }>;
-  permissions: PermissionKey[];
-};
+/* -------------------- Config -------------------- */
 
 const menuItems: SidebarMenuItem[] = [
   {
-    label: "Dashboard",
+    label: "แดชบอร์ด",
     href: "/landing/dashboard",
     icon: LuLayoutDashboard,
     permissions: ["dashboard"],
@@ -78,6 +51,9 @@ const menuItems: SidebarMenuItem[] = [
   },
 ];
 
+/* -------------------- Functions -------------------- */
+
+// Function ดึงข้อมูลผู้ใช้จาก Local Storage
 function getStoredUser() {
   if (typeof window === "undefined") return null;
 
@@ -92,6 +68,7 @@ function getStoredUser() {
   }
 }
 
+// Function ตรวจสอบ Permission ของ ID
 function hasAnyPermission(
   user: SidebarUser | null,
   permissions: PermissionKey[]
@@ -107,6 +84,7 @@ function hasAnyPermission(
   );
 }
 
+/* -------------------- Component -------------------- */
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<SidebarUser | null>(null);
@@ -118,6 +96,8 @@ function Sidebar() {
   const visibleMenuItems = useMemo(() => {
     return menuItems.filter((item) => hasAnyPermission(user, item.permissions));
   }, [user]);
+
+  /* -------------------- API fetchers -------------------- */
 
   useEffect(() => {
     const storedUser = getStoredUser();
@@ -202,46 +182,49 @@ function Sidebar() {
     router.push("/landing/login");
   };
 
+  /* -------------------- UI Sidebar -------------------- */
+
   return (
     <>
-      <nav
-        className={`relative flex h-screen flex-col bg-[#031C36] text-white transition-[width] duration-300 ease-in-out ${collapsed ? "w-[120px]" : "w-[300px]"
-          }`}
+      <nav className={`relative flex h-screen flex-col bg-slate-900 text-white transition-[width] duration-300 ease-in-out 
+      ${collapsed ? "w-24" : "w-64"}`}
       >
+        {/* Collapsed */}
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
-          className="absolute -right-5 top-10 z-20 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-[#031C36] shadow-md"
+          className="absolute -right-6 top-10 z-20 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-900 shadow-md"
           aria-label={collapsed ? "ขยาย sidebar" : "ย่อ sidebar"}
         >
           <LuChevronLeft
-            size={20}
-            className={`transition-transform duration-300 ${collapsed ? "rotate-180" : "rotate-0"
+            className={`h-6 w-6 transition-transform duration-300 ${collapsed ? "rotate-180" : "rotate-0"
               }`}
           />
         </button>
 
-        <div className="flex flex-1 flex-col overflow-hidden px-5 py-6">
+        <div className="flex flex-1 flex-col overflow-hidden p-5">
+          {/* logo */}
           <div className="mb-10 flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#9DCCFF] text-[#031C36]">
-              <FaParking size={30} />
+            <div className="flex items-center justify-center h-10 w-10 shrink-0 rounded-lg bg-blue-300 text-slate-900">
+              <p className="text-xl font-bold">P</p>
             </div>
 
             <div
               className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-in-out ${collapsed
-                  ? "max-w-0 -translate-x-2 opacity-0"
-                  : "max-w-[180px] translate-x-0 opacity-100"
+                ? "max-w-0 -translate-x-2 opacity-0"
+                : "max-w-full translate-x-0 opacity-100"
                 }`}
             >
-              <h1 className="text-[18px] font-extrabold leading-[18px]">
+              <h1 className="text-lg font-extrabold leading-none tracking-normal align-middle">
                 Smart Carpark
               </h1>
-              <p className="mt-1 text-[12px] font-semibold tracking-[0.25em] text-white/90">
+              <p className="mt-1 text-xs font-bold leading-4 tracking-widest uppercase align-middle">
                 SUPPORT
               </p>
             </div>
           </div>
 
+          {/* Sidebar */}
           <ul className="flex flex-col gap-3">
             {visibleMenuItems.map((item) => {
               const Icon = item.icon;
@@ -252,19 +235,19 @@ function Sidebar() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
-                    className={`flex items-center rounded-2xl px-4 py-4 text-[16px] transition-colors duration-200 ${isActive
-                        ? "bg-white text-[#1C2530]"
-                        : "text-white hover:bg-white/10"
+                    className={`flex items-center rounded-lg px-4 py-4 text-sm transition-colors duration-200 ${isActive
+                      ? "bg-white text-slate-900"
+                      : "text-white hover:bg-white/10"
                       } ${collapsed ? "justify-center" : "justify-start"}`}
                   >
-                    <div className="flex w-6 shrink-0 items-center justify-center">
-                      <Icon size={24} />
+                    <div className="text-2xl flex shrink-0 items-center justify-center">
+                      <Icon />
                     </div>
 
                     <span
                       className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                          ? "ml-0 max-w-0 -translate-x-2 opacity-0"
-                          : "ml-3 max-w-[220px] translate-x-0 opacity-100"
+                        ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                        : "ml-3 max-w-full translate-x-0 opacity-100"
                         }`}
                     >
                       {item.label}
@@ -275,25 +258,24 @@ function Sidebar() {
             })}
           </ul>
 
-          <div className="mt-auto border-t border-white/10 pt-5">
+          <div className="mt-auto">
             <div
-              className={`flex items-center ${collapsed ? "justify-center" : "justify-start"
+              className={`p-4 flex items-center ${collapsed ? "justify-center" : "justify-start"
                 }`}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 text-white">
-                <FiUser size={22} />
+              <div className="text-2xl">
+                <FiUser />
               </div>
 
-              <div
-                className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                    ? "ml-0 max-w-0 -translate-x-2 opacity-0"
-                    : "ml-3 max-w-[180px] translate-x-0 opacity-100"
-                  }`}
+              <div className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
+                ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                : "ml-3 max-w-full translate-x-0 opacity-100"
+                }`}
               >
-                <p className="text-[16px] font-semibold leading-5 text-white">
+                <p className="text-xs font-semibold leading-5 text-white">
                   {user?.name ?? "-"}
                 </p>
-                <p className="text-[13px] leading-5 text-white/80">
+                <p className="text-xs leading-5 text-white/80">
                   {user?.role ?? "-"}
                 </p>
               </div>
@@ -302,47 +284,53 @@ function Sidebar() {
             <button
               type="button"
               onClick={() => setOpenLogoutPopup(true)}
-              className={`mt-5 flex w-full items-center rounded-2xl px-4 py-3 text-[16px] text-white transition-colors duration-200 hover:bg-white/10 ${collapsed ? "justify-center" : "justify-start"
+              className={`cursor-pointer flex w-full items-center rounded-2xl p-4 text-sm text-white transition-colors duration-200 hover:bg-white/10 ${collapsed ? "justify-center" : "justify-start"
                 }`}
             >
-              <div className="flex w-6 shrink-0 items-center justify-center">
-                <LuLogOut size={24} />
+              <div className="text-xl flex shrink-0 items-center justify-center">
+                <LuLogOut />
               </div>
 
               <span
                 className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                    ? "ml-0 max-w-0 -translate-x-2 opacity-0"
-                    : "ml-3 max-w-[180px] translate-x-0 opacity-100"
+                  ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                  : "ml-3 max-w-full translate-x-0 opacity-100"
                   }`}
               >
                 ออกจากระบบ
               </span>
             </button>
+            <div className="flex flex-col text-start border-t border-white/10 pt-5">
+              <p className="text-xs font-bold leading-4 tracking-normal align-middle text-zinc-400">ระบบลานจอดรถ Smart Carpark</p>
+              <p className="text-xs font-bold leading-4 tracking-normal align-middle text-zinc-400">v1.0.0</p>
+            </div>
           </div>
         </div>
       </nav>
 
+      {/* -------------------- Popup Logout -------------------- */}
+
       {openLogoutPopup ? (
         <div
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-[#031C36]/55 px-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-4 backdrop-blur-xs"
           onClick={closeLogoutConfirm}
         >
           <div
-            className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between border-b border-zinc-200 px-6 py-5">
+            <div className="flex items-start justify-between border-b border-slate-800/15 px-6 py-5 bg-slate-900/10">
               <div>
-                <h2 className="text-[30px] font-extrabold leading-tight text-[#1C2530]">
+                <h2 className="text-2xl font-bold leading-8 tracking-normal align-middle">
                   ยืนยันการออกจากระบบ
                 </h2>
-                <p className="mt-1 text-sm text-zinc-500">ยืนยันการออกจากระบบ</p>
+                <p className="mt-1 text-sm font-normal leading-5 tracking-normal align-middle text-slate-900">ยืนยันการออกจากระบบ</p>
               </div>
 
               <button
                 type="button"
                 onClick={closeLogoutConfirm}
-                className="text-[#1C2530] transition hover:opacity-70"
+                className="cursor-pointer text-slate-900 transition hover:opacity-70"
                 aria-label="ปิด"
               >
                 <LuX className="h-6 w-6" />
@@ -350,24 +338,26 @@ function Sidebar() {
             </div>
 
             <div className="px-6 py-6">
-              <div className="mx-auto flex min-h-[190px] max-w-[260px] flex-col items-center justify-center rounded-2xl bg-[#F4F7FA] px-6 py-8 text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#1C2530] shadow-sm">
-                  <FiUser className="h-7 w-7" />
+              <div className="mx-auto flex h-60 w-80 flex-col items-center justify-center rounded-lg bg-slate-100 p-8 text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-sm">
+                  <LuUsers className="h-7 w-7" />
                 </div>
 
-                <p className="text-[28px] font-bold leading-tight text-[#1C2530]">
+                <p className="text-xl font-bold leading-7 tracking-normal text-center align-middle">
                   {user?.name ?? "-"}
                 </p>
-                <p className="mt-2 text-base text-zinc-500">
+                <p className="mt-2 text-sm font-normal leading-5 tracking-normal text-center align-middle">
                   ตำแหน่ง {user?.role ?? "-"}
                 </p>
               </div>
+            </div>
 
-              <div className="mt-8 flex items-center justify-center gap-4">
+            <div className="border-t border-slate-800/15 bg-slate-900/10">
+              <div className="py-6 flex items-center justify-center gap-4">
                 <button
                   type="button"
                   onClick={closeLogoutConfirm}
-                  className="min-w-[110px] rounded-full bg-[#031C36] px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
+                  className="cursor-pointer text-sm font-semibold leading-5 tracking-normal text-center align-middle rounded-full bg-slate-900/50 px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
                 >
                   ยกเลิก
                 </button>
@@ -375,7 +365,7 @@ function Sidebar() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="min-w-[110px] rounded-full bg-[#031C36] px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
+                  className="cursor-pointer text-sm font-semibold leading-5 tracking-normal text-center align-middle rounded-full bg-slate-900 px-6 py-3 text-base font-semibold text-white transition hover:opacity-90"
                 >
                   ตกลง
                 </button>

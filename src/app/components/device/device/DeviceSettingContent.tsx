@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
     LuBell,
     LuCamera,
+    LuMonitor,
     LuPencil,
     LuPlus,
     LuPrinter,
@@ -17,6 +18,8 @@ import type {
     DevicesConfigResponse,
 } from "@/src/app/type/device/device";
 
+const KIOSK_DEVICE_TYPE = "kiosk";
+
 const DEFAULT_FORM: DevicePayload = {
     deviceCode: "",
     deviceName: "",
@@ -25,10 +28,26 @@ const DEFAULT_FORM: DevicePayload = {
     ipAddress: null,
     status: "active",
     note: "",
+    location: "",
+};
+
+type KioskActivationResult = {
+    message: string;
+    code: string;
+    deviceId: string;
+    expiresIn: string;
 };
 
 function getToken() {
     return typeof window !== "undefined" ? localStorage.getItem("token") : null;
+}
+
+function getAuthHeaders(token: string | null): Record<string, string> {
+    if (!token) return {};
+
+    return {
+        Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+    };
 }
 
 function getErrorMessage(value: unknown, fallback: string) {
@@ -44,7 +63,15 @@ function getErrorMessage(value: unknown, fallback: string) {
     return fallback;
 }
 
+function isKioskType(type: string) {
+    return type.toLowerCase() === KIOSK_DEVICE_TYPE;
+}
+
 function getDeviceIcon(type: string) {
+    if (isKioskType(type)) {
+        return <LuMonitor className="text-[20px]" />;
+    }
+
     if (type === "lpr") {
         return <LuCamera className="text-[20px]" />;
     }
@@ -58,7 +85,6 @@ function getDeviceIcon(type: string) {
 
 function DevicesPage() {
     const [config, setConfig] = useState<DevicesConfigResponse | null>(null);
-    const [activeTab, setActiveTab] = useState("device");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -67,6 +93,8 @@ function DevicesPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<DevicePayload>(DEFAULT_FORM);
     const [submitting, setSubmitting] = useState(false);
+    const [kioskActivationResult, setKioskActivationResult] =
+        useState<KioskActivationResult | null>(null);
 
     async function fetchConfig() {
         try {
@@ -78,7 +106,7 @@ function DevicesPage() {
             const response = await fetch("/api/devices/devices/config", {
                 method: "GET",
                 headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...getAuthHeaders(token),
                 },
                 cache: "no-store",
             });
@@ -103,7 +131,36 @@ function DevicesPage() {
 
     const devices = useMemo(() => config?.devices ?? [], [config]);
 
+    const deviceTypes = useMemo(() => {
+        const masterDeviceTypes = config?.masterData.deviceTypes ?? [];
+
+        const hasKioskType = masterDeviceTypes.some((item) =>
+            isKioskType(item.code)
+        );
+
+        if (hasKioskType) {
+            return masterDeviceTypes;
+        }
+
+        return [
+            {
+                code: KIOSK_DEVICE_TYPE,
+                label: "ตู้ Kiosk",
+            },
+            ...masterDeviceTypes,
+        ];
+    }, [config]);
+
+    const connectionTypes = useMemo(
+        () => config?.masterData.connectionTypes ?? [],
+        [config]
+    );
+
     function getDeviceTypeLabel(code: string) {
+        if (isKioskType(code)) {
+            return "ตู้ Kiosk";
+        }
+
         return (
             config?.masterData.deviceTypes.find((item) => item.code === code)
                 ?.label ?? code
@@ -117,20 +174,35 @@ function DevicesPage() {
         );
     }
 
+    function handleCloseModal() {
+        setOpenModal(false);
+        setKioskActivationResult(null);
+    }
+
     function handleOpenCreate() {
         setModalMode("create");
         setEditingId(null);
+        setKioskActivationResult(null);
+
         setForm({
             ...DEFAULT_FORM,
             deviceType: config?.masterData.deviceTypes[0]?.code ?? "",
             connectionType: config?.masterData.connectionTypes[0]?.code ?? "",
+            location: "",
         });
+
         setOpenModal(true);
     }
 
     function handleOpenEdit(device: DeviceItem) {
+        const deviceWithLocation = device as DeviceItem & {
+            location?: string | null;
+        };
+
         setModalMode("edit");
         setEditingId(device.id);
+        setKioskActivationResult(null);
+
         setForm({
             deviceCode: device.deviceCode,
             deviceName: device.deviceName,
@@ -139,7 +211,9 @@ function DevicesPage() {
             ipAddress: device.ipAddress,
             status: device.status,
             note: device.note,
+            location: deviceWithLocation.location ?? "",
         });
+
         setOpenModal(true);
     }
 
@@ -147,8 +221,46 @@ function DevicesPage() {
         try {
             setSubmitting(true);
             setError("");
+            setKioskActivationResult(null);
 
             const token = getToken();
+            const isKiosk = isKioskType(form.deviceType);
+
+            if (isKiosk && modalMode === "create") {
+                const name = form.deviceName.trim();
+                const location = form.location?.trim() ?? "";
+
+                if (!name || !location) {
+                    throw new Error("กรุณากรอก Name และ Location ให้ครบถ้วน");
+                }
+
+                const response = await fetch("/api/devices/kiosks/activation-code", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...getAuthHeaders(token),
+                    },
+                    body: JSON.stringify({
+                        name,
+                        location,
+                    }),
+                    cache: "no-store",
+                });
+
+                const result = (await response.json().catch(() => null)) as
+                    | KioskActivationResult
+                    | null;
+
+                if (!response.ok || !result) {
+                    throw new Error(
+                        getErrorMessage(result, "สร้าง Activation Code ไม่สำเร็จ")
+                    );
+                }
+
+                setKioskActivationResult(result);
+                await fetchConfig();
+                return;
+            }
 
             const url =
                 modalMode === "edit" && editingId
@@ -159,7 +271,7 @@ function DevicesPage() {
                 method: modalMode === "edit" ? "PUT" : "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...getAuthHeaders(token),
                 },
                 body: JSON.stringify(form),
             });
@@ -171,6 +283,8 @@ function DevicesPage() {
             }
 
             setOpenModal(false);
+            setForm(DEFAULT_FORM);
+            setKioskActivationResult(null);
             await fetchConfig();
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -191,7 +305,7 @@ function DevicesPage() {
             const response = await fetch(`/api/devices/devices/${id}`, {
                 method: "DELETE",
                 headers: {
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...getAuthHeaders(token),
                 },
             });
 
@@ -211,7 +325,6 @@ function DevicesPage() {
         <>
             <section className="">
                 <div className="mx-auto max-w-7xl">
-
                     {error ? (
                         <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-600">
                             {error}
@@ -219,7 +332,6 @@ function DevicesPage() {
                     ) : null}
 
                     <div className="mb-8 flex items-center justify-between">
-
                         <h2 className="border-l-[8px] border-[#061D36] pl-4 text-[32px] font-bold tracking-[-0.6px] text-[#1F2937]">
                             การตั้งค่าอุปกรณ์
                         </h2>
@@ -294,61 +406,78 @@ function DevicesPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        {devices.map((device) => (
-                                            <div
-                                                key={device.id}
-                                                className="flex items-center justify-between gap-5 rounded-2xl px-3 py-3 transition hover:bg-[#F8FAFC]"
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3F4F6] text-[#061D36] transition group-hover:bg-[#E5E7EB]">
-                                                        {getDeviceIcon(device.deviceType)}
+                                        {devices.map((device) => {
+                                            const deviceWithLocation = device as DeviceItem & {
+                                                location?: string | null;
+                                            };
+
+                                            const isKiosk = isKioskType(device.deviceType);
+                                            const deviceDetail =
+                                                device.ipAddress ??
+                                                deviceWithLocation.location ??
+                                                device.deviceCode;
+
+                                            const connectionLabel = isKiosk
+                                                ? "Activation Code"
+                                                : getConnectionLabel(device.connectionType);
+
+                                            return (
+                                                <div
+                                                    key={device.id}
+                                                    className="flex items-center justify-between gap-5 rounded-2xl px-3 py-3 transition hover:bg-[#F8FAFC]"
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3F4F6] text-[#061D36] transition group-hover:bg-[#E5E7EB]">
+                                                            {getDeviceIcon(device.deviceType)}
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="text-[20px] font-bold text-[#061D36]">
+                                                                {device.deviceName}
+                                                            </p>
+                                                            <p className="mt-1 text-[15px] text-[#64748B]">
+                                                                {deviceDetail} • {connectionLabel} •{" "}
+                                                                <span
+                                                                    className={
+                                                                        device.isOnline
+                                                                            ? "text-[#16A34A]"
+                                                                            : "text-[#EF4444]"
+                                                                    }
+                                                                >
+                                                                    {device.isOnline
+                                                                        ? "เชื่อมต่อปกติ"
+                                                                        : "ขาดการเชื่อมต่อ"}
+                                                                </span>
+                                                            </p>
+                                                        </div>
                                                     </div>
 
-                                                    <div>
-                                                        <p className="text-[20px] font-bold text-[#061D36]">
-                                                            {device.deviceName}
-                                                        </p>
-                                                        <p className="mt-1 text-[15px] text-[#64748B]">
-                                                            {device.ipAddress ?? device.deviceCode} •{" "}
-                                                            {getConnectionLabel(device.connectionType)} •{" "}
-                                                            <span
-                                                                className={
-                                                                    device.isOnline
-                                                                        ? "text-[#16A34A]"
-                                                                        : "text-[#EF4444]"
-                                                                }
-                                                            >
-                                                                {device.isOnline
-                                                                    ? "เชื่อมต่อปกติ"
-                                                                    : "ขาดการเชื่อมต่อ"}
-                                                            </span>
-                                                        </p>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="rounded-full border border-[#D0D5DD] bg-white px-3 py-1 text-[12px] font-bold text-[#475467]">
+                                                            {getDeviceTypeLabel(device.deviceType)}
+                                                        </span>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEdit(device)}
+                                                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#061D36] transition hover:bg-[#E5E7EB]"
+                                                        >
+                                                            <LuPencil size={18} />
+                                                        </button>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleDeleteDevice(device.id)
+                                                            }
+                                                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#FF2F2F] transition hover:bg-[#FFF1F1]"
+                                                        >
+                                                            <LuTrash2 size={18} />
+                                                        </button>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex items-center gap-3">
-                                                    <span className="rounded-full border border-[#D0D5DD] bg-white px-3 py-1 text-[12px] font-bold text-[#475467]">
-                                                        {getDeviceTypeLabel(device.deviceType)}
-                                                    </span>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenEdit(device)}
-                                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[#061D36] transition hover:bg-[#E5E7EB]"
-                                                    >
-                                                        <LuPencil size={18} />
-                                                    </button>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteDevice(device.id)}
-                                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-[#FF2F2F] transition hover:bg-[#FFF1F1]"
-                                                    >
-                                                        <LuTrash2 size={18} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -394,10 +523,11 @@ function DevicesPage() {
                 open={openModal}
                 mode={modalMode}
                 form={form}
-                deviceTypes={config?.masterData.deviceTypes ?? []}
-                connectionTypes={config?.masterData.connectionTypes ?? []}
+                deviceTypes={deviceTypes}
+                connectionTypes={connectionTypes}
                 submitting={submitting}
-                onClose={() => setOpenModal(false)}
+                kioskActivationResult={kioskActivationResult}
+                onClose={handleCloseModal}
                 onChange={setForm}
                 onSubmit={handleSubmitDevice}
             />

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function getBaseUrl() {
+  return process.env.BaseURL ?? process.env.BASE_URL ?? "";
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const baseUrl = process.env.BASE_URL;
+    const baseUrl = getBaseUrl();
 
     if (!baseUrl) {
       return NextResponse.json(
@@ -14,17 +18,20 @@ export async function GET(req: NextRequest) {
     const authorization = req.headers.get("authorization");
     const { searchParams } = new URL(req.url);
 
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
+    const startDate =
+      searchParams.get("start_date") || searchParams.get("startDate");
+
+    const endDate =
+      searchParams.get("end_date") || searchParams.get("endDate");
 
     const upstreamUrl = new URL(`${baseUrl}/api/v1/overview/summary`);
 
     if (startDate) {
-      upstreamUrl.searchParams.set("startDate", startDate);
+      upstreamUrl.searchParams.set("start_date", startDate);
     }
 
     if (endDate) {
-      upstreamUrl.searchParams.set("endDate", endDate);
+      upstreamUrl.searchParams.set("end_date", endDate);
     }
 
     const response = await fetch(upstreamUrl.toString(), {

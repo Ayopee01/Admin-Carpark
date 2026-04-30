@@ -18,6 +18,8 @@ export type OverviewRevenueGroup = {
     percent: number;
 };
 
+export type OverviewUsageChartMode = "daily" | "weekly" | "monthly" | "yearly";
+
 export type OverviewUsageChartItem = {
     label: string;
     value: number;
@@ -34,8 +36,11 @@ export type OverviewServiceSummaryItem = {
 
 export type OverviewSummaryResponse = {
     filters: OverviewFilters;
+    chartFilters?: OverviewFilters;
     summaryCards: OverviewSummaryCards;
     revenueGroups: OverviewRevenueGroup[];
+    usageChartMode?: OverviewUsageChartMode;
+    usageChartLabel?: string;
     usageChart: OverviewUsageChartItem[];
     serviceSummary: OverviewServiceSummaryItem[];
     totalSummaryCalculated: number;

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { LuCarFront, LuChevronDown, LuSearch } from "react-icons/lu";
 
 import Preload from "@/src/app/components/Preload";
 import TransactionsTable from "@/src/app/components/check-payment/TransactionsTable";
 import PaymentModal from "@/src/app/components/check-payment/PaymentModal";
+import DateRangeFilter from "@/src/app/components/summary/DateRangeFilter";
 
 import type {
   TransactionEditDraft,
@@ -14,19 +16,39 @@ import type {
   TransactionPaymentStatus,
 } from "@/src/app/type/check-payment/transactions";
 
+const TABLE_ITEMS_PER_PAGE = 10;
+
+type RawPaymentItem = {
+  id?: string;
+  method?: string | null;
+  channel?: string | null;
+  amount?: number;
+  paidAt?: string | null;
+  referenceNo?: string | null;
+};
+
 type RawTransactionItem = Partial<TransactionItem> & {
   payment?: Partial<TransactionItem["payment"]>;
-  paymentStatus?: TransactionPaymentStatus;
+  payments?: RawPaymentItem[];
+  paymentStatus?: string | null;
   paymentMethod?: string | null;
   status?: string;
   statusLabel?: string;
   totalPaid?: number;
+  remainingAmount?: number;
   outstandingBalance?: number;
+  baseAmount?: number;
+  totalMinutes?: number;
 };
 
 type TransactionListApiResponse = {
   data?: RawTransactionItem[];
-  meta?: TransactionListResponse["meta"];
+  meta?: TransactionListResponse["meta"] & {
+    page?: number;
+    perPage?: number;
+    total?: number;
+    totalPages?: number;
+  };
 };
 
 function getErrorMessage(value: unknown, fallback: string) {
@@ -50,20 +72,80 @@ function isTransactionListApiResponse(
   return "data" in value || "meta" in value;
 }
 
+function normalizeDateOnly(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isDateInRange(value: string | null | undefined, range?: DateRange) {
+  if (!range?.from) return true;
+  if (!value) return false;
+
+  const targetDate = new Date(value);
+
+  if (Number.isNaN(targetDate.getTime())) {
+    return false;
+  }
+
+  const target = normalizeDateOnly(targetDate).getTime();
+  const from = normalizeDateOnly(range.from).getTime();
+  const to = normalizeDateOnly(range.to ?? range.from).getTime();
+
+  return target >= from && target <= to;
+}
+
+function getLastPayment(item: RawTransactionItem) {
+  if (!Array.isArray(item.payments) || item.payments.length === 0) {
+    return null;
+  }
+
+  return item.payments[item.payments.length - 1];
+}
+
+function normalizeStatusText(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
 function mapPaymentStatus(item: RawTransactionItem): TransactionPaymentStatus {
-  if (item.payment?.status === "paid" || item.payment?.status === "unpaid") {
-    return item.payment.status;
-  }
+  const paymentStatus = normalizeStatusText(item.payment?.status);
+  const rawPaymentStatus = normalizeStatusText(item.paymentStatus);
+  const transactionStatus = normalizeStatusText(item.status);
+  const statusLabel = typeof item.statusLabel === "string" ? item.statusLabel : "";
 
-  if (item.paymentStatus === "paid" || item.paymentStatus === "unpaid") {
-    return item.paymentStatus;
-  }
-
-  if (item.status === "completed") {
+  /**
+   * paid = จ่ายครบแล้ว
+   */
+  if (
+    paymentStatus === "paid" ||
+    rawPaymentStatus === "paid" ||
+    transactionStatus === "paid" ||
+    transactionStatus === "completed" ||
+    statusLabel === "เสร็จสิ้น"
+  ) {
     return "paid";
   }
 
-  if (item.statusLabel === "เสร็จสิ้น") {
+  /**
+   * partially_paid = จ่ายบางส่วน แต่ยังไม่ครบ
+   * ดังนั้นในหน้า check-payment ให้ถือเป็น unpaid / รอชำระ
+   */
+  if (
+    paymentStatus === "unpaid" ||
+    rawPaymentStatus === "unpaid" ||
+    rawPaymentStatus === "partially_paid" ||
+    transactionStatus === "pending" ||
+    transactionStatus === "partially_paid" ||
+    transactionStatus === "cancelled" ||
+    transactionStatus === "void"
+  ) {
+    return "unpaid";
+  }
+
+  if (
+    typeof item.remainingAmount === "number" &&
+    item.remainingAmount <= 0 &&
+    typeof item.totalPaid === "number" &&
+    item.totalPaid > 0
+  ) {
     return "paid";
   }
 
@@ -78,6 +160,8 @@ function mapPaymentStatus(item: RawTransactionItem): TransactionPaymentStatus {
 }
 
 function normalizeTransaction(item: RawTransactionItem): TransactionItem {
+  const lastPayment = getLastPayment(item);
+
   return {
     id: item.id ?? "",
     billNo: item.billNo ?? "-",
@@ -86,19 +170,25 @@ function normalizeTransaction(item: RawTransactionItem): TransactionItem {
     serviceType: item.serviceType ?? "-",
     entryAt: item.entryAt ?? "",
     exitAt: item.exitAt ?? "",
-    durationMinute: item.durationMinute ?? 0,
-    amount: item.amount ?? 0,
+    durationMinute: item.durationMinute ?? item.totalMinutes ?? 0,
+    amount: item.amount ?? item.baseAmount ?? 0,
     vat: item.vat ?? 0,
     discount: item.discount ?? 0,
     netAmount: item.netAmount ?? 0,
     status: item.status ?? "pending",
     payment: {
       status: mapPaymentStatus(item),
-      method: item.payment?.method ?? item.paymentMethod ?? null,
-      paidAt: item.payment?.paidAt ?? null,
+      method:
+        item.payment?.method ??
+        item.paymentMethod ??
+        lastPayment?.method ??
+        lastPayment?.channel ??
+        null,
+      paidAt: item.payment?.paidAt ?? lastPayment?.paidAt ?? null,
       qrCodeText: item.payment?.qrCodeText ?? null,
       qrCodeImageUrl: item.payment?.qrCodeImageUrl ?? null,
-      referenceNo: item.payment?.referenceNo ?? null,
+      referenceNo:
+        item.payment?.referenceNo ?? lastPayment?.referenceNo ?? null,
     },
     receipt: {
       receiptNo: item.receipt?.receiptNo ?? null,
@@ -112,11 +202,13 @@ function normalizeTransaction(item: RawTransactionItem): TransactionItem {
 }
 
 function CheckPaymentPage() {
-  const [plateInput, setPlateInput] = useState("");
   const [searchPlate, setSearchPlate] = useState("");
+  const [debouncedSearchPlate, setDebouncedSearchPlate] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
   const [status, setStatus] = useState<"all" | TransactionPaymentStatus>("all");
   const [items, setItems] = useState<TransactionItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -130,6 +222,61 @@ function CheckPaymentPage() {
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
 
   const loadingTimerRef = useRef<number | null>(null);
+
+  const filteredItems = useMemo(() => {
+    const keyword = debouncedSearchPlate.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const plateNo = item.plateNo ?? "";
+      const billNo = item.billNo ?? "";
+      const paymentStatus = item.payment?.status ?? "unpaid";
+
+      const matchKeyword = keyword
+        ? plateNo.toLowerCase().includes(keyword) ||
+        billNo.toLowerCase().includes(keyword)
+        : true;
+
+      const matchStatus = status === "all" ? true : paymentStatus === status;
+      const matchDate = isDateInRange(item.entryAt, dateRange);
+
+      return matchKeyword && matchStatus && matchDate;
+    });
+  }, [items, debouncedSearchPlate, status, dateRange]);
+
+  const filteredTotal = filteredItems.length;
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredTotal / TABLE_ITEMS_PER_PAGE));
+  }, [filteredTotal]);
+
+  const pagedItems = useMemo(() => {
+    const start = (page - 1) * TABLE_ITEMS_PER_PAGE;
+    const end = start + TABLE_ITEMS_PER_PAGE;
+
+    return filteredItems.slice(start, end);
+  }, [filteredItems, page]);
+
+  const pageNumbers = useMemo(() => {
+    const maxVisiblePages = 5;
+    const startPage = Math.max(
+      1,
+      Math.min(page - 2, totalPages - maxVisiblePages + 1)
+    );
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+    return Array.from(
+      { length: endPage - startPage + 1 },
+      (_, index) => startPage + index
+    );
+  }, [page, totalPages]);
+
+  const firstItemNumber =
+    filteredTotal === 0 ? 0 : (page - 1) * TABLE_ITEMS_PER_PAGE + 1;
+
+  const lastItemNumber = Math.min(
+    page * TABLE_ITEMS_PER_PAGE,
+    filteredTotal
+  );
 
   function finishLoadingAfterDelay() {
     if (loadingTimerRef.current) {
@@ -145,7 +292,10 @@ function CheckPaymentPage() {
 
   async function fetchTransactions(): Promise<void> {
     try {
-      setLoading(true);
+      if (items.length === 0) {
+        setLoading(true);
+      }
+
       setProgress(8);
       setError("");
 
@@ -179,7 +329,6 @@ function CheckPaymentPage() {
       const normalizedItems = (raw.data ?? []).map(normalizeTransaction);
 
       setItems(normalizedItems);
-      setTotal(raw.meta?.total ?? normalizedItems.length);
       setProgress(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -199,8 +348,32 @@ function CheckPaymentPage() {
     };
   }, []);
 
-  function handleSearch() {
-    setSearchPlate(plateInput.trim());
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchPlate(searchPlate.trim());
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [searchPlate]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchPlate, status, dateRange]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  function handleChangeStatus(nextStatus: "all" | TransactionPaymentStatus) {
+    setStatus(nextStatus);
+  }
+
+  function handleChangeDateRange(nextRange: DateRange | undefined) {
+    setDateRange(nextRange);
   }
 
   function handleStartEdit(item: TransactionItem) {
@@ -279,21 +452,6 @@ function CheckPaymentPage() {
     setSelectedId(null);
   }
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const plateNo = item.plateNo ?? "";
-      const paymentStatus = item.payment?.status ?? "unpaid";
-
-      const matchPlate = searchPlate
-        ? plateNo.toLowerCase().includes(searchPlate.toLowerCase())
-        : true;
-
-      const matchStatus = status === "all" ? true : paymentStatus === status;
-
-      return matchPlate && matchStatus;
-    });
-  }, [items, searchPlate, status]);
-
   if (loading) {
     return (
       <Preload
@@ -315,12 +473,12 @@ function CheckPaymentPage() {
               <h1 className="text-[34px] font-extrabold leading-none text-[#2B3640]">
                 ตรวจสอบและชำระเงิน
               </h1>
-              <p className="mt-3 text-[15px] text-[#67727E]">• แออดมินบริการ</p>
+              <p className="mt-3 text-[15px] text-[#67727E]">• แอดมินบริการ</p>
             </div>
 
             <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
               <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-              <span>Real-Time</span>
+              <span>Online</span>
             </div>
           </div>
 
@@ -329,25 +487,27 @@ function CheckPaymentPage() {
               ค้นหาด้วยเลขทะเบียน
             </div>
 
-            <div className="mt-5 flex flex-col gap-4 xl:flex-row">
-              <div className="flex flex-1 items-center rounded-full border border-[#1C2A3A] bg-[#F4F4F4] px-6 py-4">
+            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="relative flex h-12 items-center rounded-full border border-gray-300 bg-[#F4F4F4] px-6">
                 <LuCarFront size={22} className="shrink-0 text-[#8D99A8]" />
+
                 <input
-                  value={plateInput}
-                  onChange={(event) => setPlateInput(event.target.value)}
+                  value={searchPlate}
+                  onChange={(event) => setSearchPlate(event.target.value)}
                   placeholder="กรอกเลขทะเบียน"
-                  className="ml-4 w-full bg-transparent text-[16px] text-[#1F2933] outline-none placeholder:text-[#9AA3AF]"
+                  className="ml-4 w-full bg-transparent pr-10 text-[16px] text-[#1F2933] outline-none placeholder:text-[#9AA3AF]"
+                />
+
+                <LuSearch
+                  size={20}
+                  className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 text-[#8D99A8]"
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={handleSearch}
-                className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-full bg-[#061D36] px-6 py-4 text-[16px] font-semibold text-white transition hover:opacity-90"
-              >
-                <LuSearch size={18} />
-                ค้นหา
-              </button>
+              <DateRangeFilter
+                value={dateRange}
+                onChange={handleChangeDateRange}
+              />
             </div>
           </div>
 
@@ -357,7 +517,8 @@ function CheckPaymentPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-[18px] font-extrabold">ผลการค้นหา</h2>
                   <span className="text-[13px] text-white/80">
-                    ({filteredItems.length} รายการ)
+                    แสดง {firstItemNumber}-{lastItemNumber} จากทั้งหมด{" "}
+                    {filteredTotal} รายการ
                   </span>
                 </div>
 
@@ -365,13 +526,13 @@ function CheckPaymentPage() {
                   <select
                     value={status}
                     onChange={(event) =>
-                      setStatus(
+                      handleChangeStatus(
                         event.target.value as "all" | TransactionPaymentStatus
                       )
                     }
                     className="appearance-none rounded-full bg-white px-5 py-2 pr-10 text-[14px] font-semibold text-[#1F2933] outline-none"
                   >
-                    <option value="all">สถานะ</option>
+                    <option value="all">สถานะทั้งหมด</option>
                     <option value="unpaid">รอชำระ</option>
                     <option value="paid">เสร็จสิ้น</option>
                   </select>
@@ -388,7 +549,7 @@ function CheckPaymentPage() {
               <div className="px-6 py-10 text-[15px] text-red-600">{error}</div>
             ) : (
               <TransactionsTable
-                items={filteredItems}
+                items={pagedItems}
                 editingId={editingId}
                 savingEditId={savingEditId}
                 draft={draft}
@@ -401,8 +562,72 @@ function CheckPaymentPage() {
             )}
           </div>
 
-          <div className="mt-4 text-sm text-[#6B7280]">
-            ทั้งหมด {total} รายการ
+          <div className="mt-5 flex flex-col gap-4 rounded-[20px] border border-[#D8DADF] bg-white px-5 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="text-sm font-medium text-[#6B7280]">
+              ทั้งหมด {filteredTotal} รายการ
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                disabled={page === 1}
+                className="h-10 rounded-full border border-[#D8DADF] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:bg-[#F4F4F4] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ก่อนหน้า
+              </button>
+
+              {page > 3 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPage(1)}
+                    className="h-10 min-w-10 rounded-full border border-[#D8DADF] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:bg-[#F4F4F4]"
+                  >
+                    1
+                  </button>
+                  <span className="px-1 text-sm text-[#6B7280]">...</span>
+                </>
+              ) : null}
+
+              {pageNumbers.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={`h-10 min-w-10 rounded-full px-4 text-sm font-semibold transition ${page === pageNumber
+                      ? "bg-[#061D36] text-white"
+                      : "border border-[#D8DADF] bg-white text-[#1F2933] hover:bg-[#F4F4F4]"
+                    }`}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+
+              {page < totalPages - 2 ? (
+                <>
+                  <span className="px-1 text-sm text-[#6B7280]">...</span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(totalPages)}
+                    className="h-10 min-w-10 rounded-full border border-[#D8DADF] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:bg-[#F4F4F4]"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((prev) => Math.min(prev + 1, totalPages))
+                }
+                disabled={page === totalPages}
+                className="h-10 rounded-full border border-[#D8DADF] bg-white px-4 text-sm font-semibold text-[#1F2933] transition hover:bg-[#F4F4F4] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ถัดไป
+              </button>
+            </div>
           </div>
         </div>
       </section>

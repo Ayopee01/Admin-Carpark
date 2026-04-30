@@ -10,6 +10,7 @@ import {
     Ticket,
     UserRound,
 } from "lucide-react";
+import { LuReceiptText, LuTrendingUp } from "react-icons/lu";
 
 import Preload from "@/src/app/components/Preload";
 import SummaryCard from "@/src/app/components/dashboard/SummaryCard";
@@ -39,9 +40,7 @@ function DashboardPage() {
                 setError("");
 
                 const token =
-                    typeof window !== "undefined"
-                        ? localStorage.getItem("token")
-                        : null;
+                    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
                 setProgress(18);
 
@@ -126,15 +125,15 @@ function DashboardPage() {
     const getChannelIcon = (icon: DashboardChannelItem["icon"]) => {
         switch (icon) {
             case "user":
-                return <UserRound size={16} strokeWidth={2.2} />;
+                return <UserRound className="h-4 w-4" strokeWidth={2.25} />;
             case "qr":
-                return <QrCode size={16} strokeWidth={2.2} />;
+                return <QrCode className="h-4 w-4" strokeWidth={2.25} />;
             case "kiosk":
-                return <MonitorSmartphone size={16} strokeWidth={2.2} />;
+                return <MonitorSmartphone className="h-4 w-4" strokeWidth={2.25} />;
             case "gate":
-                return <DoorOpen size={16} strokeWidth={2.2} />;
+                return <DoorOpen className="h-4 w-4" strokeWidth={2.25} />;
             default:
-                return <Ticket size={16} strokeWidth={2.2} />;
+                return <Ticket className="h-4 w-4" strokeWidth={2.25} />;
         }
     };
 
@@ -152,8 +151,8 @@ function DashboardPage() {
 
     if (error || !data) {
         return (
-            <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 md:px-8 md:py-8">
-                <div className="mx-auto max-w-[1280px] rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600">
+            <section className="min-h-screen bg-gray-100 px-5 py-6 md:p-20">
+                <div className="mx-auto max-w-7xl rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-600">
                     {error || "ไม่พบข้อมูล Dashboard"}
                 </div>
             </section>
@@ -161,48 +160,51 @@ function DashboardPage() {
     }
 
     return (
-        <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#2A3439] md:px-8 md:py-8">
-            <div className="mx-auto max-w-[1280px]">
+        <section className="min-h-screen bg-gray-100 px-5 py-6 text-slate-700 md:p-20">
+            <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex items-center justify-between">
                     <div>
-                        <h1 className="text-4xl font-bold leading-8 tracking-[-0.6px] text-[#2A3439]">
+                        <h1 className="text-4xl font-bold leading-8 tracking-tight text-slate-700">
                             จัดการระบบ
                         </h1>
-                        <p className="mt-2 text-xs font-medium leading-[18px] text-gray-500">
+
+                        <p className="mt-2 text-xs font-medium leading-5 text-gray-500">
                             • ติดตามรายได้และปริมาณการใช้งาน
                         </p>
                     </div>
 
                     <div
-                        className={`flex h-10 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold ${data.isRealtime
-                            ? "border-sm bg-white text-[#38B449]"
-                            : "border-sm bg-white text-[#667085]"
+                        className={`flex h-10 items-center gap-2 rounded-full border bg-white px-4 py-2 text-xs font-semibold ${data.isRealtime
+                                ? "border-green-100 text-green-600"
+                                : "border-slate-200 text-slate-500"
                             }`}
                     >
                         <span
-                            className={`h-2 w-2 rounded-full ${data.isRealtime ? "bg-[#38B449]" : "bg-[#98A2B3]"
+                            className={`h-2 w-2 rounded-full ${data.isRealtime ? "bg-green-500" : "bg-slate-400"
                                 }`}
                         />
-                        <span>{data.isRealtime ? "Real-Time" : "Offline"}</span>
+
+                        <span>{data.isRealtime ? "Online" : "Offline"}</span>
                     </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <SummaryCard
-                        title="บัตรทั้งหมด"
+                        title="บิลทั้งหมด"
                         value={formatNumber(data.summaryCards.totalTickets)}
                         suffix="tickets"
-                        note="↗ Today’s Total"
-                        icon={<Ticket size={16} strokeWidth={2.2} />}
+                        note="Today’s Total"
+                        noteIcon={
+                            <LuTrendingUp className="h-3.5 w-3.5" strokeWidth={2.5} />
+                        }
+                        icon={<LuReceiptText className="h-4 w-4" strokeWidth={2.25} />}
                     />
 
                     <SummaryCard
                         title="ชำระเงินแล้ว"
                         value={formatNumber(data.summaryCards.paidCount)}
-                        note={`฿ ${formatNumber(
-                            data.summaryCards.paidRevenue
-                        )}.00 Total`}
-                        icon={<BadgeCheck size={16} strokeWidth={2.2} />}
+                        note={`฿ ${formatNumber(data.summaryCards.paidRevenue)}.00 Total`}
+                        icon={<BadgeCheck className="h-4 w-4" strokeWidth={2.25} />}
                     />
 
                     <SummaryCard
@@ -210,15 +212,16 @@ function DashboardPage() {
                         value={formatNumber(data.summaryCards.pendingCount)}
                         suffix="pending"
                         note=""
-                        icon={<Clock3 size={16} strokeWidth={2.2} />}
+                        icon={<Clock3 className="h-4 w-4" strokeWidth={2.25} />}
                     />
                 </div>
 
                 <div className="mt-10">
-                    <h2 className="text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[#1F2937] md:text-[32px]">
+                    <h2 className="text-3xl font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
                         การชำระค่าบริการ
                     </h2>
-                    <p className="mt-2 text-[12px] font-medium leading-[18px] text-[#6B7280]">
+
+                    <p className="mt-2 text-xs font-medium leading-5 text-gray-500">
                         • ช่องทางการชำระค่าบริการ
                     </p>
 
@@ -230,19 +233,18 @@ function DashboardPage() {
                                 description={getRevenueDescription(group)}
                                 amountText={formatCurrency(group.amount)}
                                 percent={group.percent}
-                                icon={getChannelIcon(
-                                    group.id === "staff" ? "user" : "qr"
-                                )}
+                                icon={getChannelIcon(group.id === "staff" ? "user" : "qr")}
                             />
                         ))}
                     </div>
                 </div>
 
                 <div className="mt-10">
-                    <h2 className="text-[28px] font-extrabold leading-none tracking-[-0.03em] text-[#1F2937] md:text-[32px]">
+                    <h2 className="text-3xl font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
                         ยอดชำระค่าบริการแต่ละช่องทาง
                     </h2>
-                    <p className="mt-2 text-[12px] font-medium leading-[18px] text-[#6B7280]">
+
+                    <p className="mt-2 text-xs font-medium leading-5 text-gray-500">
                         • ติดตามปริมาณการใช้งานในแต่ละช่องทางบริการ
                     </p>
 

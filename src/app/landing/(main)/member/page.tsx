@@ -1,14 +1,36 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-//Icons
-import { LuCheck, LuCreditCard, LuDownload, LuLayoutDashboard, LuPalette, LuPencil, LuPlus, LuReceipt, LuSearch, LuSettings, LuSlidersHorizontal, LuTrash2, LuX } from "react-icons/lu";
-//Components
+// Icons
+import {
+  LuCheck,
+  LuCreditCard,
+  LuDownload,
+  LuLayoutDashboard,
+  LuPalette,
+  LuPencil,
+  LuPlus,
+  LuReceipt,
+  LuSearch,
+  LuSettings,
+  LuSlidersHorizontal,
+  LuTrash2,
+  LuX,
+} from "react-icons/lu";
+// Components
 import AddMemberModal from "@/src/app/components/member/AddMemberModal";
-import PermissionModal, { type PermissionItem } from "@/src/app/components/member/PermissionModal";
-//Types
-import type { CreateMemberPayload, Member, MemberRole, MemberStats, MemberStatus } from "@/src/app/type/member/member";
+import PermissionModal, {
+  type PermissionItem,
+} from "@/src/app/components/member/PermissionModal";
 import Preload from "@/src/app/components/Preload";
+// Types
+import type {
+  CreateMemberPayload,
+  Member,
+  MemberRole,
+  MemberStats,
+  MemberStatus,
+} from "@/src/app/type/member/member";
 
 const PERMISSIONS: PermissionItem[] = [
   {
@@ -130,18 +152,14 @@ function formatThaiDateTime(date: Date) {
     .replace(",", "");
 }
 
-function StatCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: number | string;
-}) {
+function StatCard({ title, value }: { title: string; value: number | string }) {
   return (
-    <article className="relative min-h-[138px] rounded-[8px] bg-[#E4E6E8] px-8 pb-5 pt-7">
-      <div className="absolute inset-x-0 top-0 h-[4px] rounded-t-[8px] bg-[#1F2937]" />
-      <p className="text-[13px] font-bold text-[#1F2937]">{title}</p>
-      <p className="mt-5 text-[48px] font-bold leading-none tracking-[-0.6px] text-[#26313C]">
+    <article className="relative min-h-36 rounded-lg bg-gray-200 px-8 pb-5 pt-7">
+      <div className="absolute inset-x-0 top-0 h-1 rounded-t-lg bg-gray-800" />
+
+      <p className="text-sm font-bold text-gray-800">{title}</p>
+
+      <p className="mt-5 text-5xl font-bold leading-none tracking-tight text-slate-700">
         {value}
       </p>
     </article>
@@ -159,11 +177,11 @@ function StatusToggle({
     <button
       type="button"
       onClick={onClick}
-      className={`relative h-[24px] w-[48px] rounded-full transition ${checked ? "bg-[#21B947]" : "bg-[#D0D5DD]"
+      className={`relative h-6 w-12 rounded-full transition ${checked ? "bg-green-500" : "bg-gray-300"
         }`}
     >
       <span
-        className={`absolute top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full bg-white transition ${checked ? "right-[3px]" : "left-[3px]"
+        className={`absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white transition ${checked ? "right-0.5" : "left-0.5"
           }`}
       />
     </button>
@@ -428,6 +446,7 @@ function MemberPage() {
       setError("");
 
       const token = getToken();
+
       const payload: CreateMemberPayload = {
         ...form,
         permissions: normalizePermissions(form.permissions),
@@ -505,6 +524,7 @@ function MemberPage() {
       setError("");
 
       const token = getToken();
+
       const payload = {
         permissions: normalizePermissions(permissionDraft),
       };
@@ -565,44 +585,44 @@ function MemberPage() {
 
   return (
     <>
-      <section className="min-h-screen bg-[#F3F4F6] px-6 py-8 text-[#1F2937] md:px-8">
-        <div className="mx-auto max-w-[1400px]">
+      <section className="min-h-screen bg-gray-100 px-6 py-8 text-gray-800 md:px-20">
+        <div className="mx-auto max-w-screen-7xl">
           <div className="mb-7 flex items-start justify-between">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
-              <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-              <span>Real-Time</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-green-500 bg-green-50 px-4 py-2 text-sm font-semibold text-green-600">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              <span>Online</span>
             </div>
 
-            <p className="text-[13px] text-[#9CA3AF]">
-              {currentDateTime || "-"}
-            </p>
+            <p className="text-sm text-gray-400">{currentDateTime || "-"}</p>
           </div>
 
           <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
             <div>
-              <h1 className="text-[42px] font-bold leading-8 tracking-[-0.6px] text-[#1F2937]">
+              <h1 className="text-4xl font-bold leading-8 tracking-tight text-gray-800">
                 การตั้งค่าสมาชิก
               </h1>
-              <p className="mt-4 text-[15px] text-[#6B7280]">
+
+              <p className="mt-4 text-base text-gray-500">
                 จัดการข้อมูลและสิทธิ์การใช้งานของสมาชิก
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-[320px] items-center rounded-full border border-[#1F2937] bg-white px-5">
-                <LuSearch size={18} className="text-[#6B7280]" />
+              <div className="flex h-12 w-80 items-center rounded-full border border-gray-800 bg-white px-5">
+                <LuSearch size={18} className="text-gray-500" />
+
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="ค้นหา..."
-                  className="ml-3 w-full bg-transparent text-[14px] outline-none placeholder:text-[#8A94A6]"
+                  className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
                 />
               </div>
 
               <button
                 type="button"
                 onClick={handleDownload}
-                className="inline-flex h-12 items-center gap-3 rounded-full bg-[#061D36] px-7 text-[14px] font-bold text-white"
+                className="inline-flex h-12 items-center gap-3 rounded-full bg-slate-900 px-7 text-sm font-bold text-white transition hover:opacity-90"
               >
                 <LuDownload size={17} />
                 ดาวน์โหลด
@@ -611,7 +631,7 @@ function MemberPage() {
               <button
                 type="button"
                 onClick={() => setOpenAdd(true)}
-                className="inline-flex h-12 items-center gap-3 rounded-full bg-[#061D36] px-7 text-[14px] font-bold text-white"
+                className="inline-flex h-12 items-center gap-3 rounded-full bg-slate-900 px-7 text-sm font-bold text-white transition hover:opacity-90"
               >
                 <LuPlus size={17} />
                 เพิ่มสมาชิก
@@ -631,9 +651,9 @@ function MemberPage() {
             <StatCard title="ADMINS" value={stats.totalAdmins} />
           </div>
 
-          <div className="mt-8 overflow-hidden rounded-[18px] border border-[#061D36] bg-white">
-            <table className="w-full min-w-[1100px]">
-              <thead className="bg-[#061D36] text-left text-[13px] font-bold text-white">
+          <div className="mt-8 overflow-x-auto rounded-2xl border border-slate-900 bg-white">
+            <table className="min-w-max w-full table-auto">
+              <thead className="bg-slate-900 text-left text-sm font-bold text-white">
                 <tr>
                   <th className="px-10 py-8">ชื่อ-นามสกุล</th>
                   <th className="px-6 py-8">E-MAIL</th>
@@ -649,7 +669,7 @@ function MemberPage() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-10 py-10 text-center text-[#6B7280]"
+                      className="px-10 py-10 text-center text-gray-500"
                     >
                       ไม่พบข้อมูลสมาชิก
                     </td>
@@ -659,7 +679,7 @@ function MemberPage() {
                     const isEditing = editingId === member.id;
 
                     return (
-                      <tr key={member.id} className="border-b border-[#EEF0F3]">
+                      <tr key={member.id} className="border-b border-gray-100">
                         <td className="px-10 py-8">
                           {isEditing ? (
                             <div className="flex gap-2">
@@ -672,7 +692,7 @@ function MemberPage() {
                                   }))
                                 }
                                 placeholder="ชื่อ"
-                                className="h-9 w-[120px] border border-[#1F2937] px-3 text-[14px] outline-none"
+                                className="h-9 w-32 border border-gray-800 px-3 text-sm outline-none"
                               />
 
                               <input
@@ -684,11 +704,11 @@ function MemberPage() {
                                   }))
                                 }
                                 placeholder="นามสกุล"
-                                className="h-9 w-[140px] border border-[#1F2937] px-3 text-[14px] outline-none"
+                                className="h-9 w-36 border border-gray-800 px-3 text-sm outline-none"
                               />
                             </div>
                           ) : (
-                            <span className="text-[16px] font-bold text-[#111827]">
+                            <span className="text-base font-bold text-gray-900">
                               {getMemberFullName(member) || "-"}
                             </span>
                           )}
@@ -704,7 +724,7 @@ function MemberPage() {
                                   email: event.target.value,
                                 }))
                               }
-                              className="h-9 w-[210px] border border-[#1F2937] px-3 text-[14px] outline-none"
+                              className="h-9 w-52 border border-gray-800 px-3 text-sm outline-none"
                             />
                           ) : (
                             member.email || "-"
@@ -721,7 +741,7 @@ function MemberPage() {
                                   phone: event.target.value,
                                 }))
                               }
-                              className="h-9 w-[160px] border border-[#1F2937] px-3 text-[14px] outline-none"
+                              className="h-9 w-40 border border-gray-800 px-3 text-sm outline-none"
                             />
                           ) : (
                             member.phone || "-"
@@ -738,7 +758,7 @@ function MemberPage() {
                                   role: event.target.value as MemberRole,
                                 }))
                               }
-                              className="h-9 rounded-md border border-[#1F2937] bg-white px-3 text-[14px] outline-none"
+                              className="h-9 rounded-md border border-gray-800 bg-white px-3 text-sm outline-none"
                             >
                               {ROLE_OPTIONS.map((role) => (
                                 <option key={role.value} value={role.value}>
@@ -747,7 +767,7 @@ function MemberPage() {
                               ))}
                             </select>
                           ) : (
-                            <span className="rounded-full border border-[#D5DAE1] bg-white px-3 py-1 text-[12px] font-bold">
+                            <span className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-bold">
                               {formatRole(member.role)}
                             </span>
                           )}
@@ -765,7 +785,7 @@ function MemberPage() {
                             <button
                               type="button"
                               onClick={() => handleOpenPermission(member)}
-                              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#E5E7EB] bg-white px-4 text-[13px] font-bold"
+                              className="inline-flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-4 text-sm font-bold transition hover:bg-gray-50"
                             >
                               <LuSettings size={15} />
                               ตั้งค่าสิทธิ์
@@ -777,7 +797,7 @@ function MemberPage() {
                                   type="button"
                                   onClick={() => handleSaveEdit(member.id)}
                                   disabled={submitting}
-                                  className="text-[#16A34A] disabled:opacity-60"
+                                  className="text-green-600 disabled:opacity-60"
                                 >
                                   <LuCheck size={22} />
                                 </button>
@@ -786,7 +806,7 @@ function MemberPage() {
                                   type="button"
                                   onClick={handleCancelEdit}
                                   disabled={submitting}
-                                  className="text-[#6B7280] disabled:opacity-60"
+                                  className="text-gray-500 disabled:opacity-60"
                                 >
                                   <LuX size={22} />
                                 </button>
@@ -796,7 +816,7 @@ function MemberPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleStartEdit(member)}
-                                  className="text-[#061D36]"
+                                  className="text-slate-900"
                                 >
                                   <LuPencil size={22} />
                                 </button>
@@ -804,7 +824,7 @@ function MemberPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(member.id)}
-                                  className="text-[#FF2F2F]"
+                                  className="text-red-500"
                                 >
                                   <LuTrash2 size={22} />
                                 </button>

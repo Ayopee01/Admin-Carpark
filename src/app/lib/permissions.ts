@@ -1,16 +1,4 @@
-export type PermissionKey =
-    | "dashboard"
-    | "transactions"
-    | "overview"
-    | "pricing"
-    | "devices"
-    | "theme"
-    | "settings";
-
-export type PermissionUser = {
-    role?: string | null;
-    permissions?: string[] | null;
-};
+import type { PermissionKey, PermissionUser } from "@/src/app/type/auth/Permission";
 
 export function hasPermission(
     user: PermissionUser | null | undefined,

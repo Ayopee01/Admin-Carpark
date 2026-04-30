@@ -6,11 +6,20 @@ import { LuBanknote, LuQrCode, LuX } from "react-icons/lu";
 
 type PaymentStatus = "paid" | "unpaid";
 
+type RawPaymentStatus = PaymentStatus | "pending" | "completed" | "cancelled";
+
+type PaymentItem = {
+  id?: string;
+  method?: string | null;
+  amount?: number;
+  paidAt?: string | null;
+};
+
 type TransactionDetailResponse = {
   id: string;
   billNo: string;
   plateNo: string;
-  durationMinute: number;
+  durationHour: number;
   netAmount: number;
   payment: {
     status: PaymentStatus;
@@ -28,22 +37,48 @@ type RawTransactionDetailResponse = {
   id: string;
   billNo?: string;
   plateNo?: string;
-  durationMinute?: number;
+
+  vehicleType?: string;
+  serviceType?: string;
+  entryAt?: string | null;
+  exitAt?: string | null;
+  calculatedAt?: string | null;
+  exitTimeLimit?: string | null;
+  isOverstay?: boolean;
+
+  status?: RawPaymentStatus;
+  baseAmount?: number;
   netAmount?: number;
+  totalPaid?: number;
+  remainingAmount?: number;
+  serviceDisplay?: string;
+  durationHour?: number;
+  totalMinutes?: number;
+
+  // เผื่อ backend เก่ายังส่ง durationMinute มา
+  durationMinute?: number;
+
+  payments?: PaymentItem[];
+
   payment?: {
-    status?: PaymentStatus;
+    status?: RawPaymentStatus;
     method?: string | null;
     qrCodeText?: string | null;
     qrCodeImageUrl?: string | null;
   };
-  paymentStatus?: PaymentStatus;
+
+  paymentStatus?: RawPaymentStatus;
   paymentMethod?: string | null;
   qrCodeText?: string | null;
   qrCodeImageUrl?: string | null;
+
   receiptPreview?: {
     printableText?: string | null;
     canPrint?: boolean;
   };
+
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type PaymentMode = "qr" | "cash";
@@ -55,28 +90,43 @@ type Props = {
   onSuccess: () => Promise<void> | void;
 };
 
-function formatDuration(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
+function normalizePaymentStatus(status?: RawPaymentStatus | null): PaymentStatus {
+  if (status === "paid" || status === "completed") return "paid";
+  return "unpaid";
+}
 
-  if (hours > 0 && mins > 0) return `${hours} ชม. ${mins} นาที`;
-  if (hours > 0) return `${hours} ชม.`;
-  return `${mins} นาที`;
+function formatDurationHour(hours: number) {
+  return `${hours} ชั่วโมง`;
 }
 
 function normalizeDetail(raw: RawTransactionDetailResponse): TransactionDetailResponse {
+  const firstPayment = raw.payments?.[0];
+
   return {
     id: raw.id,
     billNo: raw.billNo ?? "-",
     plateNo: raw.plateNo ?? "-",
-    durationMinute: raw.durationMinute ?? 0,
+
+    // ใช้ durationHour จาก API ใหม่เป็นหลัก
+    durationHour:
+      raw.durationHour ??
+      Math.ceil((raw.totalMinutes ?? raw.durationMinute ?? 0) / 60),
+
     netAmount: raw.netAmount ?? 0,
+
     payment: {
-      status: raw.payment?.status ?? raw.paymentStatus ?? "unpaid",
-      method: raw.payment?.method ?? raw.paymentMethod ?? null,
+      status: normalizePaymentStatus(
+        raw.payment?.status ?? raw.paymentStatus ?? raw.status
+      ),
+      method:
+        raw.payment?.method ??
+        raw.paymentMethod ??
+        firstPayment?.method ??
+        null,
       qrCodeText: raw.payment?.qrCodeText ?? raw.qrCodeText ?? null,
       qrCodeImageUrl: raw.payment?.qrCodeImageUrl ?? raw.qrCodeImageUrl ?? null,
     },
+
     receiptPreview: {
       printableText: raw.receiptPreview?.printableText ?? null,
       canPrint: raw.receiptPreview?.canPrint ?? false,
@@ -89,7 +139,10 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<PaymentMode>("qr");
   const [printReceipt, setPrintReceipt] = useState(true);
-  const [cashReceived, setCashReceived] = useState("");
+
+  // ให้เริ่มต้นเป็น 0 เสมอ ไม่อิง netAmount
+  const [cashReceived, setCashReceived] = useState("0");
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -104,6 +157,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         setError("");
         setDetail(null);
 
+        // reset ทุกครั้งที่เปิดรายการใหม่ กันค่าเก่าค้าง
+        setCashReceived("0");
+
         const token = localStorage.getItem("token");
 
         const res = await fetch(`/api/check-payment/transactions/${transactionId}`, {
@@ -115,10 +171,15 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
           cache: "no-store",
         });
 
-        const json = (await res.json().catch(() => null)) as RawTransactionDetailResponse | null;
+        const json = (await res.json().catch(() => null)) as
+          | RawTransactionDetailResponse
+          | null;
 
         if (!res.ok || !json) {
-          throw new Error((json as { message?: string } | null)?.message || "ไม่สามารถโหลดรายละเอียดรายการได้");
+          throw new Error(
+            (json as { message?: string } | null)?.message ||
+            "ไม่สามารถโหลดรายละเอียดรายการได้"
+          );
         }
 
         const normalized = normalizeDetail(json);
@@ -126,7 +187,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         if (!ignore) {
           setDetail(normalized);
           setMode(normalized.payment.method === "cash" ? "cash" : "qr");
-          setCashReceived(String(normalized.netAmount ?? 0));
+
+          // ไม่อิง netAmount แล้ว ให้ admin กรอกเองทุกครั้ง
+          setCashReceived("0");
         }
       } catch (err) {
         if (!ignore) {
@@ -177,14 +240,14 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
           body: JSON.stringify(
             mode === "qr"
               ? {
-                  method: "qr",
-                  printReceipt,
-                }
+                method: "qr",
+                printReceipt,
+              }
               : {
-                  method: "cash",
-                  receivedAmount,
-                  printReceipt,
-                }
+                method: "cash",
+                receivedAmount,
+                printReceipt,
+              }
           ),
         }
       );
@@ -198,7 +261,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
       await onSuccess();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "ไม่สามารถยืนยันการชำระเงินได้");
+      setError(
+        err instanceof Error ? err.message : "ไม่สามารถยืนยันการชำระเงินได้"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -208,7 +273,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[999] flex items-center justify-center bg-[#2E3445]/85 px-4 py-6 backdrop-blur-[2px]"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-[#2E3445]/85 px-4 py-6 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
@@ -218,14 +283,16 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-6 top-6 text-[#1F2933] transition hover:opacity-70"
+          className="absolute right-6 top-6 text-slate-900 transition hover:opacity-70"
           aria-label="ปิด"
         >
-          <LuX size={24} />
+          <LuX />
         </button>
 
         {loading ? (
-          <div className="py-20 text-center text-[#64748B]">กำลังโหลดข้อมูล...</div>
+          <div className="py-20 text-center text-[#64748B]">
+            กำลังโหลดข้อมูล...
+          </div>
         ) : error && !detail ? (
           <div className="py-20 text-center text-red-600">{error}</div>
         ) : detail ? (
@@ -234,6 +301,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
               <h2 className="text-[34px] font-extrabold leading-none text-[#101C2B]">
                 ทำรายการชำระเงิน
               </h2>
+
               <p className="mt-3 text-[14px] text-[#7A8795]">
                 ตรวจสอบความถูกต้องก่อนชำระ
               </p>
@@ -249,7 +317,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                 <div className="flex items-center justify-between border-b border-[#E3E7EB] pb-3">
                   <span className="text-[14px] text-[#8A95A3]">เวลาที่จอด</span>
                   <span className="text-[18px] font-bold text-[#1F2933]">
-                    {formatDuration(detail.durationMinute)}
+                    {formatDurationHour(detail.durationHour)}
                   </span>
                 </div>
 
@@ -259,7 +327,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                     <span className="text-[54px] font-extrabold leading-none text-[#101C2B]">
                       {detail.netAmount.toFixed(2)}
                     </span>
-                    <span className="pb-2 text-[22px] font-bold text-[#101C2B]">฿</span>
+                    <span className="pb-2 text-[22px] font-bold text-[#101C2B]">
+                      ฿
+                    </span>
                   </div>
                 </div>
               </div>
@@ -280,31 +350,33 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                 <button
                   type="button"
                   onClick={() => setMode("qr")}
-                  className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${
-                    mode === "qr"
+                  className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${mode === "qr"
                       ? "border-[#8CC2FF] bg-[#EEF5FD]"
                       : "border-transparent bg-[#EFF1F3]"
-                  }`}
+                    }`}
                 >
                   <div className="mb-2 flex h-10 w-20 items-center justify-center rounded-lg bg-white text-[#1D2A36]">
                     <LuQrCode size={22} />
                   </div>
-                  <span className="text-[14px] font-bold text-[#1F2933]">สแกนจ่าย</span>
+                  <span className="text-[14px] font-bold text-[#1F2933]">
+                    สแกนจ่าย
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMode("cash")}
-                  className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${
-                    mode === "cash"
+                  className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${mode === "cash"
                       ? "border-[#8CC2FF] bg-[#EEF5FD]"
                       : "border-transparent bg-[#EFF1F3]"
-                  }`}
+                    }`}
                 >
                   <div className="mb-2 flex h-10 w-20 items-center justify-center rounded-lg bg-white text-[#1D2A36]">
                     <LuBanknote size={22} />
                   </div>
-                  <span className="text-[14px] font-bold text-[#1F2933]">เงินสด</span>
+                  <span className="text-[14px] font-bold text-[#1F2933]">
+                    เงินสด
+                  </span>
                 </button>
               </div>
 
@@ -326,7 +398,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                         </p>
                       </div>
                     ) : (
-                      <div className="text-[#64748B]">ยังไม่มี QR Code สำหรับรายการนี้</div>
+                      <div className="text-[#64748B]">
+                        ยังไม่มี QR Code สำหรับรายการนี้
+                      </div>
                     )}
                   </div>
                 </div>
@@ -344,7 +418,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                       onChange={(event) => setCashReceived(event.target.value)}
                       className="w-full bg-transparent text-right text-[40px] font-extrabold text-[#1F2933] outline-none"
                     />
-                    <span className="ml-3 text-[22px] font-bold text-[#94A3B8]">฿</span>
+                    <span className="ml-3 text-[22px] font-bold text-[#94A3B8]">
+                      ฿
+                    </span>
                   </div>
 
                   <div className="mt-5 rounded-[22px] bg-[#EEF3F9] px-6 py-8">
@@ -355,7 +431,9 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                       <span className="text-[48px] font-extrabold leading-none text-[#101C2B]">
                         {changeAmount.toFixed(2)}
                       </span>
-                      <span className="pb-2 text-[22px] font-bold text-[#101C2B]">฿</span>
+                      <span className="pb-2 text-[22px] font-bold text-[#101C2B]">
+                        ฿
+                      </span>
                     </div>
                   </div>
                 </div>

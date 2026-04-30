@@ -40,7 +40,7 @@ function getLoadingDetail(activeTab: SettingMenuKey) {
   }
 }
 
-function SettingDevicePage() {
+function DevicePage() {
   const [activeTab, setActiveTab] = useState<SettingMenuKey>("device");
   const [currentDateTime, setCurrentDateTime] = useState("");
   const [loading, setLoading] = useState(true);
@@ -151,7 +151,7 @@ function SettingDevicePage() {
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
             <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-            <span>Real-Time</span>
+            <span>Online</span>
           </div>
 
           <div className="text-[13px] text-[#9CA3AF]">
@@ -177,4 +177,4 @@ function SettingDevicePage() {
   );
 }
 
-export default SettingDevicePage;
+export default DevicePage;

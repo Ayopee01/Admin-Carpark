@@ -10,6 +10,9 @@ export type DeviceItem = {
     status: DeviceStatus;
     isOnline: boolean;
     note: string;
+
+    // ใช้เฉพาะอุปกรณ์ประเภท Kiosk
+    location?: string | null;
 };
 
 export type DeviceSummary = {
@@ -40,4 +43,7 @@ export type DevicePayload = {
     ipAddress: string | null;
     status: DeviceStatus;
     note: string;
+
+    // ใช้เฉพาะตอนเลือกประเภท Kiosk
+    location?: string | null;
 };
