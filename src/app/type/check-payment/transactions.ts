@@ -4,9 +4,9 @@ export type VehicleType = "car" | "motorcycle";
 export type TransactionStatus =
   | "pending"
   | "partially_paid"
+  | "paid_waiting_exit"
   | "completed"
   | "cancelled"
-  | "paid"
   | string;
 export type PaymentMethod = "cash" | "qr" | "bank1" | "wallet" | "other" | string;
 export type PaymentChannel = "cashier" | "mobile" | "kiosk" | "gate" | string;
@@ -131,7 +131,6 @@ export type AdminPaymentResponse = {
   };
 };
 
-export type TransactionPaymentStatus = "paid" | "unpaid";
 export type TransactionEditDraft = { plateNo: string };
 
 // View model kept for the existing table UI. It is derived only from
@@ -146,7 +145,6 @@ export type TransactionItem = {
   netAmount: number;
   status: TransactionStatus;
   payment: {
-    status: TransactionPaymentStatus;
     method: string | null;
     paidAt: ISODateString | null;
   };

@@ -49,8 +49,6 @@ function TransactionRow({
   onCancelEdit,
   onSaveEdit,
 }: Props) {
-  const paymentStatus = item.payment?.status ?? "unpaid";
-
   return (
     <tr className="border-b border-[#E2E5EA] text-[14px] text-[#1F2933]">
       <td className="px-6 py-6">{item.billNo}</td>
@@ -71,7 +69,7 @@ function TransactionRow({
       <td className="px-6 py-6">{formatCurrency(item.netAmount)}</td>
 
       <td className="px-6 py-6">
-        <TransactionStatusBadge status={paymentStatus} />
+        <TransactionStatusBadge status={item.status} />
       </td>
 
       <td className="px-6 py-6">

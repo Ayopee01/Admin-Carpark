@@ -387,9 +387,9 @@ export type VehicleType = "car" | "motorcycle";
 export type TransactionStatus =
   | "pending"
   | "partially_paid"
+  | "paid_waiting_exit"
   | "completed"
   | "cancelled"
-  | "paid"
   | string;
 
 export type PaymentMethod = "cash" | "qr" | "bank1" | "wallet" | "other" | string;
@@ -582,6 +582,18 @@ export type TransactionStatusUpdateResponse = {
 - ปุ่มชำระเงิน admin ใช้ `POST /api/v1/transactions/:id/payment`
 - หลังชำระเงินสำเร็จให้ refetch detail และ list
 - `id` ใน path สามารถเป็น transaction id หรือ plateNo ได้ตาม Backend
+
+## Transaction Status Meaning
+
+Frontend ต้องแสดงผลสถานะตามความหมายล่าสุดจาก Backend ดังนี้:
+
+| Status | ความหมาย |
+| --- | --- |
+| `pending` | ยังไม่จ่าย |
+| `partially_paid` | จ่ายบางส่วน หรือจ่ายแล้วแต่ยอดยังไม่ครบ/มีค่าเพิ่มหลังเกินเวลาออก |
+| `paid_waiting_exit` | จ่ายครบแล้ว รอรถออกภายในเวลาที่กำหนด |
+| `completed` | รถออกแล้ว transaction จบจริง |
+| `cancelled` | ยกเลิก |
 
 ---
 

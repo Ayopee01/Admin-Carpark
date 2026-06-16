@@ -22,7 +22,7 @@ function TransactionActions({
   onCancelEdit,
   onSaveEdit,
 }: Props) {
-  const paymentStatus = item.payment?.status ?? "unpaid";
+  const canPay = item.status === "pending" || item.status === "partially_paid";
 
   if (isEditing) {
     return (
@@ -50,7 +50,7 @@ function TransactionActions({
     );
   }
 
-  if (paymentStatus === "unpaid") {
+  if (canPay) {
     return (
       <div className="flex items-center justify-end gap-3">
         <button

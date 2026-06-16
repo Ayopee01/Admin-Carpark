@@ -13,7 +13,7 @@ import type {
   TransactionEditDraft,
   TransactionItem,
   TransactionListResponse,
-  TransactionPaymentStatus,
+  TransactionStatus,
 } from "@/src/app/type/check-payment/transactions";
 
 const TABLE_ITEMS_PER_PAGE = 10;
@@ -68,12 +68,6 @@ function getLastPayment(item: RawTransactionItem) {
   return item.latestPayment;
 }
 
-function mapPaymentStatus(item: RawTransactionItem): TransactionPaymentStatus {
-  return item.amount.remaining <= 0 || item.status === "paid" || item.status === "completed"
-    ? "paid"
-    : "unpaid";
-}
-
 function normalizeTransaction(item: RawTransactionItem): TransactionItem {
   const lastPayment = getLastPayment(item);
 
@@ -87,19 +81,20 @@ function normalizeTransaction(item: RawTransactionItem): TransactionItem {
     netAmount: item.amount.net,
     status: item.status,
     payment: {
-      status: mapPaymentStatus(item),
       method: lastPayment?.method ?? null,
       paidAt: lastPayment?.paidAt ?? null,
     },
   };
 }
 
+type StatusFilter = "all" | TransactionStatus;
+
 function CheckPaymentPage() {
   const [searchPlate, setSearchPlate] = useState("");
   const [debouncedSearchPlate, setDebouncedSearchPlate] = useState("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
-  const [status, setStatus] = useState<"all" | TransactionPaymentStatus>("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [items, setItems] = useState<TransactionItem[]>([]);
   const [page, setPage] = useState(1);
 
@@ -122,14 +117,12 @@ function CheckPaymentPage() {
     return items.filter((item) => {
       const plateNo = item.plateNo ?? "";
       const billNo = item.billNo ?? "";
-      const paymentStatus = item.payment?.status ?? "unpaid";
-
       const matchKeyword = keyword
         ? plateNo.toLowerCase().includes(keyword) ||
         billNo.toLowerCase().includes(keyword)
         : true;
 
-      const matchStatus = status === "all" ? true : paymentStatus === status;
+      const matchStatus = status === "all" ? true : item.status === status;
       const matchDate = isDateInRange(item.entryAt, dateRange);
 
       return matchKeyword && matchStatus && matchDate;
@@ -261,7 +254,7 @@ function CheckPaymentPage() {
     }
   }, [page, totalPages]);
 
-  function handleChangeStatus(nextStatus: "all" | TransactionPaymentStatus) {
+  function handleChangeStatus(nextStatus: StatusFilter) {
     setStatus(nextStatus);
   }
 
@@ -420,14 +413,17 @@ function CheckPaymentPage() {
                     value={status}
                     onChange={(event) =>
                       handleChangeStatus(
-                        event.target.value as "all" | TransactionPaymentStatus
+                        event.target.value as StatusFilter
                       )
                     }
                     className="appearance-none rounded-full bg-white px-5 py-2 pr-10 text-[14px] font-semibold text-[#1F2933] outline-none"
                   >
                     <option value="all">สถานะทั้งหมด</option>
-                    <option value="unpaid">รอชำระ</option>
-                    <option value="paid">เสร็จสิ้น</option>
+                    <option value="pending">ยังไม่จ่าย</option>
+                    <option value="partially_paid">จ่ายบางส่วน</option>
+                    <option value="paid_waiting_exit">จ่ายครบ รอรถออก</option>
+                    <option value="completed">รถออกแล้ว</option>
+                    <option value="cancelled">ยกเลิก</option>
                   </select>
 
                   <LuChevronDown
