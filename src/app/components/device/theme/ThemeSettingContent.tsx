@@ -2,46 +2,70 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+type ThemeMode = "theme1" | "theme2" | "theme3" | "custom";
 
-type PresetKey = "preset1" | "preset2" | "preset3" | "preset4";
-
-type ThemePreset = {
-    themeColor: string;
+type ThemeApiResponse = {
+    themeColor: string | null;
+    logoUrl: string | null;
+    configUpdatedAt?: string;
+    themeMode?: string | null;
+    customThemeColor?: string | null;
+    updatedAt?: string;
 };
 
-type ThemePresets = Record<PresetKey, ThemePreset>;
-
-type ThemeApiConfig = {
+type ThemeState = {
     themeColor: string;
     logoUrl: string | null;
-    themeName?: string;
-    primaryColor?: string;
-    secondaryColor?: string;
-    accentColor?: string;
+    configUpdatedAt?: string;
+    themeMode: ThemeMode;
+    customThemeColor: string;
     updatedAt?: string;
-    method?: string;
-    action?: string;
-    presets: ThemePresets;
 };
 
 type ThemePutPayload = {
     themeColor: string;
-    logoUrl: string | null;
-    presets: {
-        preset4: {
-            themeColor: string;
-        };
-    };
+    themeMode: ThemeMode;
+    customThemeColor: string;
 };
 
 type ColorOption = {
-    key: PresetKey;
+    mode: ThemeMode;
     title: string;
     subtitle: string;
     color: string;
 };
 
 const THEME_API_PATH = "/api/devices/theme";
+
+const DEFAULT_THEME_COLOR = "#FFD54F";
+const DEFAULT_CUSTOM_COLOR = "#FFD54F";
+
+const THEME_OPTIONS: Record<ThemeMode, ColorOption> = {
+    theme1: {
+        mode: "theme1",
+        title: "ธีม 01",
+        subtitle: DEFAULT_THEME_COLOR,
+        color: DEFAULT_THEME_COLOR,
+    },
+    theme2: {
+        mode: "theme2",
+        title: "ธีม 02",
+        subtitle: "#1D4ED8",
+        color: "#1D4ED8",
+    },
+    theme3: {
+        mode: "theme3",
+        title: "ธีม 03",
+        subtitle: "#047857",
+        color: "#047857",
+    },
+    custom: {
+        mode: "custom",
+        title: "Custom",
+        subtitle: DEFAULT_CUSTOM_COLOR,
+        color: DEFAULT_CUSTOM_COLOR,
+    },
+};
 
 function getToken() {
     return typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -52,9 +76,9 @@ function getErrorMessage(value: unknown, fallback: string) {
         value &&
         typeof value === "object" &&
         "message" in value &&
-        typeof value.message === "string"
+        typeof (value as { message?: unknown }).message === "string"
     ) {
-        return value.message;
+        return (value as { message: string }).message;
     }
 
     return fallback;
@@ -64,14 +88,14 @@ function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
 
-function getThemeFromResult(result: unknown): Partial<ThemeApiConfig> | null {
+function getThemeFromResult(result: unknown): Partial<ThemeApiResponse> | null {
     if (!isObject(result)) return null;
 
     if (isObject(result.theme)) {
-        return result.theme as Partial<ThemeApiConfig>;
+        return result.theme as Partial<ThemeApiResponse>;
     }
 
-    return result as Partial<ThemeApiConfig>;
+    return result as Partial<ThemeApiResponse>;
 }
 
 function isHexColor(value: string) {
@@ -85,65 +109,52 @@ function normalizeHexInput(value: string) {
     return `#${withoutHash.slice(0, 6).toUpperCase()}`;
 }
 
-function normalizeTheme(value?: Partial<ThemeApiConfig> | null): ThemeApiConfig {
-    if (!value?.themeColor || !isHexColor(value.themeColor)) {
-        throw new Error("ข้อมูล themeColor จาก API ไม่ถูกต้อง");
-    }
+function normalizeThemeMode(value: unknown, fallback: ThemeMode = "theme1"): ThemeMode {
+    if (value === "theme1") return "theme1";
+    if (value === "theme2") return "theme2";
+    if (value === "theme3") return "theme3";
+    if (value === "custom") return "custom";
 
-    if (!value.presets || !isObject(value.presets)) {
-        throw new Error("ข้อมูล presets จาก API ไม่ครบ");
-    }
+    return fallback;
+}
 
-    const preset1 = value.presets.preset1?.themeColor;
-    const preset2 = value.presets.preset2?.themeColor;
-    const preset3 = value.presets.preset3?.themeColor;
-    const preset4 = value.presets.preset4?.themeColor;
+function normalizeTheme(
+    value?: Partial<ThemeApiResponse> | null,
+    fallbackMode: ThemeMode = "theme1"
+): ThemeState {
+    const apiThemeColor = value?.themeColor;
+    const apiCustomThemeColor = value?.customThemeColor;
+    const themeMode = normalizeThemeMode(value?.themeMode, fallbackMode);
+    const customThemeColor =
+        typeof apiCustomThemeColor === "string" && isHexColor(apiCustomThemeColor)
+            ? apiCustomThemeColor
+            : DEFAULT_CUSTOM_COLOR;
 
-    if (
-        !isHexColor(preset1 ?? "") ||
-        !isHexColor(preset2 ?? "") ||
-        !isHexColor(preset3 ?? "") ||
-        !isHexColor(preset4 ?? "")
-    ) {
-        throw new Error("ค่าสีใน presets จาก API ไม่ถูกต้อง");
-    }
+    const themeColor =
+        themeMode === "custom"
+            ? customThemeColor
+            : typeof apiThemeColor === "string" && isHexColor(apiThemeColor)
+                ? apiThemeColor
+                : THEME_OPTIONS[themeMode].color;
 
     return {
-        themeColor: value.themeColor,
-        logoUrl: typeof value.logoUrl === "string" ? value.logoUrl : null,
-        themeName: value.themeName,
-        primaryColor: value.primaryColor,
-        secondaryColor: value.secondaryColor,
-        accentColor: value.accentColor,
-        updatedAt: value.updatedAt,
-        method: value.method,
-        action: value.action,
-        presets: {
-            preset1: {
-                themeColor: preset1 as string,
-            },
-            preset2: {
-                themeColor: preset2 as string,
-            },
-            preset3: {
-                themeColor: preset3 as string,
-            },
-            preset4: {
-                themeColor: preset4 as string,
-            },
-        },
+        themeColor,
+        logoUrl: typeof value?.logoUrl === "string" ? value.logoUrl : null,
+        configUpdatedAt:
+            typeof value?.configUpdatedAt === "string"
+                ? value.configUpdatedAt
+                : undefined,
+        themeMode,
+        customThemeColor,
+        updatedAt: typeof value?.updatedAt === "string" ? value.updatedAt : undefined,
     };
 }
 
-function toThemePutPayload(theme: ThemeApiConfig, customColor: string): ThemePutPayload {
+function toThemePutPayload(theme: ThemeState): ThemePutPayload {
     return {
         themeColor: theme.themeColor,
-        logoUrl: theme.logoUrl,
-        presets: {
-            preset4: {
-                themeColor: customColor,
-            },
-        },
+        themeMode: theme.themeMode,
+        customThemeColor: theme.customThemeColor,
     };
 }
 
@@ -165,13 +176,12 @@ function getUploadedLogoUrl(result: unknown) {
     return null;
 }
 
-function getActivePresetKey(theme: ThemeApiConfig): PresetKey {
-    const matchedPreset = Object.entries(theme.presets).find(
-        ([, preset]) =>
-            preset.themeColor.toLowerCase() === theme.themeColor.toLowerCase()
-    );
+function getThemeOptionColor(mode: ThemeMode, customColor: string) {
+    if (mode === "custom") {
+        return isHexColor(customColor) ? customColor : DEFAULT_CUSTOM_COLOR;
+    }
 
-    return (matchedPreset?.[0] as PresetKey | undefined) ?? "preset1";
+    return THEME_OPTIONS[mode].color;
 }
 
 function applyThemeColorToRoot(themeColor: string) {
@@ -188,6 +198,7 @@ type ThemeOptionCardProps = {
     title: string;
     subtitle: string;
     color: string;
+    selected: boolean;
     active: boolean;
     onClick: () => void;
 };
@@ -196,6 +207,7 @@ function ThemeOptionCard({
     title,
     subtitle,
     color,
+    selected,
     active,
     onClick,
 }: ThemeOptionCardProps) {
@@ -203,9 +215,9 @@ function ThemeOptionCard({
         <button
             type="button"
             onClick={onClick}
-            className={`min-h-[108px] rounded-[14px] border bg-[#E9EEF3] px-4 py-3 text-left transition ${active
-                    ? "border-[#0D1B2A] shadow-[0_0_0_1px_#0D1B2A]"
-                    : "border-transparent hover:border-[#CBD5E1]"
+            className={`min-h-[108px] rounded-[14px] border bg-[#E9EEF3] px-4 py-3 text-left transition ${selected
+                ? "border-[#0D1B2A] shadow-[0_0_0_1px_#0D1B2A]"
+                : "border-transparent hover:border-[#CBD5E1]"
                 }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -238,7 +250,7 @@ type CustomColorEditorProps = {
 };
 
 function CustomColorEditor({ value, onChange }: CustomColorEditorProps) {
-    const safeColor = isHexColor(value) ? value : "#000000";
+    const safeColor = isHexColor(value) ? value : DEFAULT_CUSTOM_COLOR;
 
     function handleChange(nextValue: string) {
         onChange(normalizeHexInput(nextValue));
@@ -252,7 +264,7 @@ function CustomColorEditor({ value, onChange }: CustomColorEditorProps) {
 
             <div className="rounded-[16px] bg-[#E9EEF3] p-4">
                 <div className="text-[12px] font-semibold text-[#667085]">
-                    สี Custom ของ Preset 4
+                    สี Custom
                 </div>
 
                 <div className="mt-3 flex items-center gap-3">
@@ -269,17 +281,17 @@ function CustomColorEditor({ value, onChange }: CustomColorEditorProps) {
                     <input
                         value={value}
                         onChange={(event) => handleChange(event.target.value)}
-                        placeholder="#000000"
+                        placeholder="#FFD54F"
                         className={`h-11 flex-1 rounded-[10px] border bg-white px-4 text-[15px] font-semibold outline-none ${isHexColor(value)
-                                ? "border-[#D0D5DD] text-[#1F2937]"
-                                : "border-red-300 text-red-600"
+                            ? "border-[#D0D5DD] text-[#1F2937]"
+                            : "border-red-300 text-red-600"
                             }`}
                     />
                 </div>
 
                 {!isHexColor(value) ? (
                     <div className="mt-3 text-[12px] font-semibold text-red-500">
-                        กรุณากรอกค่าสีแบบ HEX เช่น #000000
+                        กรุณากรอกค่าสีแบบ HEX เช่น #FFD54F
                     </div>
                 ) : null}
             </div>
@@ -290,12 +302,12 @@ function CustomColorEditor({ value, onChange }: CustomColorEditorProps) {
 function ThemeSettingContent() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [theme, setTheme] = useState<ThemeApiConfig | null>(null);
-    const [draft, setDraft] = useState<ThemeApiConfig | null>(null);
+    const [theme, setTheme] = useState<ThemeState | null>(null);
+    const [draft, setDraft] = useState<ThemeState | null>(null);
 
-    const [selectedPresetKey, setSelectedPresetKey] =
-        useState<PresetKey>("preset1");
-    const [customColor, setCustomColor] = useState("");
+    const [selectedThemeMode, setSelectedThemeMode] =
+        useState<ThemeMode>("theme1");
+    const [customColor, setCustomColor] = useState(DEFAULT_CUSTOM_COLOR);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -303,9 +315,11 @@ function ThemeSettingContent() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    async function fetchTheme() {
+    async function fetchTheme(showLoading = true) {
         try {
-            setLoading(true);
+            if (showLoading) {
+                setLoading(true);
+            }
             setError("");
             setSuccess("");
 
@@ -325,18 +339,23 @@ function ThemeSettingContent() {
                 throw new Error(getErrorMessage(result, "โหลดข้อมูลธีมไม่สำเร็จ"));
             }
 
-            const nextTheme = normalizeTheme(getThemeFromResult(result));
-            const activePresetKey = getActivePresetKey(nextTheme);
+            const latestTheme = normalizeTheme(getThemeFromResult(result));
 
-            setTheme(nextTheme);
-            setDraft(nextTheme);
-            setSelectedPresetKey(activePresetKey);
-            setCustomColor(nextTheme.presets.preset4.themeColor);
-            applyThemeColorToRoot(nextTheme.themeColor);
+            setTheme(latestTheme);
+            setDraft(latestTheme);
+
+            setSelectedThemeMode(latestTheme.themeMode);
+            setCustomColor(latestTheme.customThemeColor);
+
+            applyThemeColorToRoot(latestTheme.themeColor);
+            return latestTheme;
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+            return null;
         } finally {
-            setLoading(false);
+            if (showLoading) {
+                setLoading(false);
+            }
         }
     }
 
@@ -345,51 +364,42 @@ function ThemeSettingContent() {
     }, []);
 
     const colorOptions = useMemo<ColorOption[]>(() => {
-        if (!draft) return [];
+        const safeCustomColor = isHexColor(customColor)
+            ? customColor
+            : DEFAULT_CUSTOM_COLOR;
 
         return [
+            THEME_OPTIONS.theme1,
+            THEME_OPTIONS.theme2,
+            THEME_OPTIONS.theme3,
             {
-                key: "preset1",
-                title: "ธีม 01",
-                subtitle: draft.presets.preset1.themeColor,
-                color: draft.presets.preset1.themeColor,
-            },
-            {
-                key: "preset2",
-                title: "ธีม 02",
-                subtitle: draft.presets.preset2.themeColor,
-                color: draft.presets.preset2.themeColor,
-            },
-            {
-                key: "preset3",
-                title: "ธีม 03",
-                subtitle: draft.presets.preset3.themeColor,
-                color: draft.presets.preset3.themeColor,
-            },
-            {
-                key: "preset4",
-                title: "Custom",
-                subtitle: draft.presets.preset4.themeColor,
-                color: draft.presets.preset4.themeColor,
+                ...THEME_OPTIONS.custom,
+                subtitle: safeCustomColor,
+                color: safeCustomColor,
             },
         ];
-    }, [draft]);
+    }, [customColor]);
 
-    function handleSelectPreset(key: PresetKey) {
+    function handleSelectThemeMode(mode: ThemeMode) {
         if (!draft) return;
 
-        const nextColor = draft.presets[key].themeColor;
+        const nextColor = getThemeOptionColor(mode, customColor);
 
-        setSelectedPresetKey(key);
+        setSelectedThemeMode(mode);
         setError("");
         setSuccess("");
 
         setDraft({
             ...draft,
             themeColor: nextColor,
+            themeMode: mode,
+            customThemeColor:
+                mode === "custom" && isHexColor(nextColor)
+                    ? nextColor
+                    : draft.customThemeColor,
         });
 
-        if (key === "preset4") {
+        if (mode === "custom") {
             setCustomColor(nextColor);
         }
 
@@ -400,7 +410,7 @@ function ThemeSettingContent() {
         if (!draft) return;
 
         setCustomColor(value);
-        setSelectedPresetKey("preset4");
+        setSelectedThemeMode("custom");
         setError("");
         setSuccess("");
 
@@ -408,12 +418,8 @@ function ThemeSettingContent() {
             setDraft({
                 ...draft,
                 themeColor: value,
-                presets: {
-                    ...draft.presets,
-                    preset4: {
-                        themeColor: value,
-                    },
-                },
+                themeMode: "custom",
+                customThemeColor: value,
             });
 
             applyThemeColorToRoot(value);
@@ -423,8 +429,13 @@ function ThemeSettingContent() {
     async function handleSave() {
         if (!draft) return;
 
-        if (!isHexColor(customColor)) {
-            setError("กรุณาระบุค่าสี Custom ของ Preset 4 ให้ถูกต้อง เช่น #000000");
+        if (selectedThemeMode === "custom" && !isHexColor(customColor)) {
+            setError("กรุณาระบุค่าสี Custom ให้ถูกต้อง เช่น #FFD54F");
+            return;
+        }
+
+        if (!isHexColor(draft.themeColor)) {
+            setError("กรุณาเลือกค่าสีให้ถูกต้อง เช่น #FFD54F");
             return;
         }
 
@@ -434,7 +445,8 @@ function ThemeSettingContent() {
             setSuccess("");
 
             const token = getToken();
-            const payload = toThemePutPayload(draft, customColor);
+
+            const payload = toThemePutPayload(draft);
 
             const response = await fetch(THEME_API_PATH, {
                 method: "PUT",
@@ -451,13 +463,40 @@ function ThemeSettingContent() {
                 throw new Error(getErrorMessage(result, "บันทึกธีมไม่สำเร็จ"));
             }
 
-            const updatedTheme = normalizeTheme(getThemeFromResult(result) ?? draft);
-            const activePresetKey = getActivePresetKey(updatedTheme);
+            const responseTheme = getThemeFromResult(result);
+            const updatedTheme = normalizeTheme(
+                responseTheme
+                    ? {
+                        ...draft,
+                        ...responseTheme,
+                        customThemeColor:
+                            responseTheme.customThemeColor ?? draft.customThemeColor,
+                    }
+                    : draft,
+                draft.themeMode
+            );
 
-            setTheme(updatedTheme);
-            setDraft(updatedTheme);
-            setSelectedPresetKey(activePresetKey);
-            setCustomColor(updatedTheme.presets.preset4.themeColor);
+            setTheme((prev) => ({
+                themeColor: updatedTheme.themeColor,
+                logoUrl: prev?.logoUrl ?? updatedTheme.logoUrl ?? null,
+                configUpdatedAt: updatedTheme.configUpdatedAt,
+                themeMode: updatedTheme.themeMode,
+                customThemeColor: updatedTheme.customThemeColor,
+                updatedAt: updatedTheme.updatedAt,
+            }));
+
+            setDraft((prev) => ({
+                themeColor: updatedTheme.themeColor,
+                logoUrl: prev?.logoUrl ?? updatedTheme.logoUrl ?? null,
+                configUpdatedAt: updatedTheme.configUpdatedAt,
+                themeMode: updatedTheme.themeMode,
+                customThemeColor: updatedTheme.customThemeColor,
+                updatedAt: updatedTheme.updatedAt,
+            }));
+
+            setSelectedThemeMode(updatedTheme.themeMode);
+            setCustomColor(updatedTheme.customThemeColor);
+
             applyThemeColorToRoot(updatedTheme.themeColor);
             setSuccess("บันทึกธีมสำเร็จ");
         } catch (err) {
@@ -470,22 +509,22 @@ function ThemeSettingContent() {
     function handleCancel() {
         if (!theme) return;
 
-        const activePresetKey = getActivePresetKey(theme);
-
         setDraft(theme);
-        setSelectedPresetKey(activePresetKey);
-        setCustomColor(theme.presets.preset4.themeColor);
+        setSelectedThemeMode(theme.themeMode);
+        setCustomColor(theme.customThemeColor);
+
         setError("");
         setSuccess("");
         applyThemeColorToRoot(theme.themeColor);
     }
 
     async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+        const currentTheme = theme;
         const file = event.target.files?.[0];
 
         event.target.value = "";
 
-        if (!file) return;
+        if (!file || !currentTheme) return;
 
         if (!file.type.startsWith("image/")) {
             setError("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
@@ -522,6 +561,15 @@ function ThemeSettingContent() {
                 throw new Error("อัปโหลดสำเร็จ แต่ไม่พบ logoUrl จาก API");
             }
 
+            setTheme((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        logoUrl,
+                    }
+                    : prev
+            );
+
             setDraft((prev) =>
                 prev
                     ? {
@@ -531,7 +579,8 @@ function ThemeSettingContent() {
                     : prev
             );
 
-            setSuccess("อัปโหลดโลโก้แล้ว กดบันทึกเพื่อยืนยัน");
+            setSuccess("อัปโหลดโลโก้สำเร็จ");
+            await fetchTheme();
         } catch (err) {
             setError(err instanceof Error ? err.message : "อัปโหลดโลโก้ไม่สำเร็จ");
         } finally {
@@ -539,18 +588,59 @@ function ThemeSettingContent() {
         }
     }
 
-    function handleRemoveLogo() {
-        setDraft((prev) =>
-            prev
-                ? {
-                    ...prev,
-                    logoUrl: null,
-                }
-                : prev
-        );
+    async function handleRemoveLogo() {
+        const currentTheme = theme;
 
-        setError("");
-        setSuccess("ลบโลโก้ในแบบร่างแล้ว กดบันทึกเพื่อยืนยัน");
+        if (!currentTheme) return;
+
+        try {
+            setUploadingLogo(true);
+            setError("");
+            setSuccess("");
+
+            const token = getToken();
+
+            const response = await fetch(
+                `${THEME_API_PATH}/logo`,
+                {
+                    method: "DELETE",
+                    headers: {
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                }
+            );
+
+            const result: unknown = await response.json().catch(() => null);
+
+            if (!response.ok && response.status !== 204) {
+                throw new Error(getErrorMessage(result, "ลบโลโก้ไม่สำเร็จ"));
+            }
+
+            setTheme((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        logoUrl: null,
+                    }
+                    : prev
+            );
+
+            setDraft((prev) =>
+                prev
+                    ? {
+                        ...prev,
+                        logoUrl: null,
+                    }
+                    : prev
+            );
+
+            setSuccess("ลบโลโก้สำเร็จ");
+            await fetchTheme();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "ลบโลโก้ไม่สำเร็จ");
+        } finally {
+            setUploadingLogo(false);
+        }
     }
 
     if (loading) {
@@ -605,17 +695,18 @@ function ThemeSettingContent() {
                     <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {colorOptions.map((option) => (
                             <ThemeOptionCard
-                                key={option.key}
+                                key={option.mode}
                                 title={option.title}
                                 subtitle={option.subtitle}
                                 color={option.color}
-                                active={selectedPresetKey === option.key}
-                                onClick={() => handleSelectPreset(option.key)}
+                                selected={selectedThemeMode === option.mode}
+                                active={theme.themeMode === option.mode}
+                                onClick={() => handleSelectThemeMode(option.mode)}
                             />
                         ))}
                     </div>
 
-                    {selectedPresetKey === "preset4" ? (
+                    {selectedThemeMode === "custom" ? (
                         <div className="mt-8">
                             <CustomColorEditor
                                 value={customColor}

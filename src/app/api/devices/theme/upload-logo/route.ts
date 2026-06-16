@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 function getBaseUrl() {
-    return process.env.BASE_URL || process.env.BaseURL || "";
+    return process.env.BaseURL || process.env.BASE_URL || "";
 }
 
 function getErrorMessage(value: unknown, fallback: string) {
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         if (!baseUrl) {
             return NextResponse.json(
                 {
-                    message: "Missing BASE_URL or BaseURL in environment variables",
+                    message: "Missing BaseURL or BASE_URL in environment variables",
                 },
                 { status: 500 }
             );
@@ -138,7 +138,6 @@ export async function POST(req: NextRequest) {
                         data,
                         `อัปโหลดโลโก้ไม่สำเร็จจาก backend status ${response.status}`
                     ),
-                    targetUrl,
                     raw: data ?? responseText,
                 },
                 { status: response.status }

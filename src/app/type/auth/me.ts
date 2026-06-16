@@ -1,8 +1,1 @@
-export type MeResponse = {
-  id: string;
-  username: string;
-  name: string;
-  email: string;
-  role: string;
-  permissions: string[];
-};
+export type { MeResponse, User } from "@/src/app/type/auth/auth";

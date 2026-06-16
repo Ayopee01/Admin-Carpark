@@ -12,11 +12,18 @@ export async function POST(request: NextRequest) {
         }
 
         const authorization = request.headers.get("authorization");
-        const body = await request.json();
+        const body = await request.json().catch(() => null);
+        const record =
+            body && typeof body === "object"
+                ? (body as Record<string, unknown>)
+                : {};
 
         const payload = {
-            name: body.name ?? "",
-            location: body.location ?? "",
+            name: record.name ?? "",
+            deviceName: record.deviceName ?? record.name ?? "",
+            deviceCode: record.deviceCode,
+            location: record.location ?? "",
+            note: record.note,
         };
 
         const response = await fetch(

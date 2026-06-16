@@ -79,9 +79,11 @@ function PaidBillContent() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    async function fetchReceiptSettings() {
+    async function fetchReceiptSettings(showLoading = true) {
         try {
-            setLoading(true);
+            if (showLoading) {
+                setLoading(true);
+            }
             setError("");
             setSuccess("");
 
@@ -115,10 +117,14 @@ function PaidBillContent() {
 
             setReceipt(nextReceipt);
             setDraft(nextReceipt);
+            return nextReceipt;
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+            return null;
         } finally {
-            setLoading(false);
+            if (showLoading) {
+                setLoading(false);
+            }
         }
     }
 
@@ -174,10 +180,7 @@ function PaidBillContent() {
                 throw new Error(getErrorMessage(result, "บันทึกข้อมูลใบหลังชำระไม่สำเร็จ"));
             }
 
-            const saved = result?.receipt ?? draft;
-
-            setReceipt(saved);
-            setDraft(saved);
+            await fetchReceiptSettings(false);
             setSuccess("บันทึกข้อมูลใบหลังชำระเรียบร้อยแล้ว");
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");

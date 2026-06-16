@@ -1,18 +1,21 @@
-export type MemberStatus = "active" | "inactive";
-export type MemberRole = "super_admin" | "admin" | "manager" | "staff" | string;
+import type { ISODateString, Permission } from "@/src/app/type/common";
+import type { UserRole, UserStatus } from "@/src/app/type/auth/auth";
+
+export type MemberStatus = UserStatus;
+export type MemberRole = UserRole;
 
 export type Member = {
   id: string;
+  username: string;
   firstName: string;
   lastName: string;
-  fullName: string;
-  email: string;
+  email: string | null;
   phone: string;
   role: MemberRole;
   status: MemberStatus;
-  permissions: string[];
-  createdAt: string;
-  updatedAt: string;
+  permissions: Permission[];
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 };
 
 export type MemberStats = {
@@ -22,24 +25,22 @@ export type MemberStats = {
 };
 
 export type CreateMemberPayload = {
+  username?: string;
+  password: string;
+  name?: string;
   firstName: string;
   lastName: string;
   email: string;
-  password: string;
   phone: string;
-  role: string;
-  permissions: string[];
-};
-
-export type UpdateMemberPayload = {
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  phone?: string;
-  role?: string;
+  role: MemberRole;
   status?: MemberStatus;
+  permissions: Permission[];
 };
 
-export type UpdatePermissionsPayload = {
-  permissions: string[];
+export type UpdateMemberPayload = Partial<Omit<CreateMemberPayload, "password">> & {
+  password?: string;
 };
+
+export type UpdatePermissionsPayload = { permissions: Permission[] };
+export type MemberPermissionsUpdateResponse = { message: string; member: Member };
+export type MemberDeleteResponse = { message: string };

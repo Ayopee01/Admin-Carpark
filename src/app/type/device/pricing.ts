@@ -1,46 +1,30 @@
-export type PricingStatus = "active" | "inactive";
+import type { ConfigMeta } from "@/src/app/type/common";
+import type { VehicleType } from "@/src/app/type/check-payment/transactions";
+
+export type PricingStatus = "active" | "inactive" | string;
+export type FeeType =
+  | "base_hour"
+  | "next_hour"
+  | "overnight_day"
+  | "overnight_week"
+  | "overnight_month"
+  | "overnight_year";
 
 export type PricingRule = {
-    id: string;
-    serviceType: string;
-    vehicleType: string;
-    hourStart: number;
-    hourEnd: number;
-    price: number;
-    status: PricingStatus;
+  id: string;
+  name: string;
+  feeType: FeeType;
+  vehicleType: VehicleType;
+  price: number;
+  baseHours: number;
+  hourStart: number;
+  hourEnd: number | null;
+  periodUnit: "day" | "week" | "month" | "year" | null | string;
+  periodStart: number;
+  periodEnd: number | null;
+  status: PricingStatus;
 };
 
-export type PaymentChannel = {
-    code: string;
-    label: string;
-    enabled: boolean;
-};
-
-export type ServiceChannelMapping = {
-    serviceType: string;
-    channelCodes: string[];
-};
-
-export type MasterDataItem = {
-    code: string;
-    label: string;
-};
-
-export type ServicePricingConfig = {
-    pricingRules: PricingRule[];
-    paymentChannels: PaymentChannel[];
-    serviceChannelMapping: ServiceChannelMapping[];
-    masterData: {
-        serviceTypes: MasterDataItem[];
-        vehicleTypes: MasterDataItem[];
-    };
-};
-
-export type PricingRulePayload = {
-    serviceType: string;
-    vehicleType: string;
-    hourStart: number;
-    hourEnd: number;
-    price: number;
-    status?: PricingStatus;
-};
+export type ServicePricingConfig = ConfigMeta & { pricingRules: PricingRule[] };
+export type PricingRulePayload = Partial<Omit<PricingRule, "id">> & { price: number };
+export type MasterDataItem = { code: string; label: string };

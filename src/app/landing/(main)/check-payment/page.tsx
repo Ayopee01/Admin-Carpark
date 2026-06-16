@@ -18,38 +18,9 @@ import type {
 
 const TABLE_ITEMS_PER_PAGE = 10;
 
-type RawPaymentItem = {
-  id?: string;
-  method?: string | null;
-  channel?: string | null;
-  amount?: number;
-  paidAt?: string | null;
-  referenceNo?: string | null;
-};
+type RawTransactionItem = TransactionListResponse["data"][number];
 
-type RawTransactionItem = Partial<TransactionItem> & {
-  payment?: Partial<TransactionItem["payment"]>;
-  payments?: RawPaymentItem[];
-  paymentStatus?: string | null;
-  paymentMethod?: string | null;
-  status?: string;
-  statusLabel?: string;
-  totalPaid?: number;
-  remainingAmount?: number;
-  outstandingBalance?: number;
-  baseAmount?: number;
-  totalMinutes?: number;
-};
-
-type TransactionListApiResponse = {
-  data?: RawTransactionItem[];
-  meta?: TransactionListResponse["meta"] & {
-    page?: number;
-    perPage?: number;
-    total?: number;
-    totalPages?: number;
-  };
-};
+type TransactionListApiResponse = TransactionListResponse;
 
 function getErrorMessage(value: unknown, fallback: string) {
   if (
@@ -94,110 +65,32 @@ function isDateInRange(value: string | null | undefined, range?: DateRange) {
 }
 
 function getLastPayment(item: RawTransactionItem) {
-  if (!Array.isArray(item.payments) || item.payments.length === 0) {
-    return null;
-  }
-
-  return item.payments[item.payments.length - 1];
-}
-
-function normalizeStatusText(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
+  return item.latestPayment;
 }
 
 function mapPaymentStatus(item: RawTransactionItem): TransactionPaymentStatus {
-  const paymentStatus = normalizeStatusText(item.payment?.status);
-  const rawPaymentStatus = normalizeStatusText(item.paymentStatus);
-  const transactionStatus = normalizeStatusText(item.status);
-  const statusLabel = typeof item.statusLabel === "string" ? item.statusLabel : "";
-
-  /**
-   * paid = จ่ายครบแล้ว
-   */
-  if (
-    paymentStatus === "paid" ||
-    rawPaymentStatus === "paid" ||
-    transactionStatus === "paid" ||
-    transactionStatus === "completed" ||
-    statusLabel === "เสร็จสิ้น"
-  ) {
-    return "paid";
-  }
-
-  /**
-   * partially_paid = จ่ายบางส่วน แต่ยังไม่ครบ
-   * ดังนั้นในหน้า check-payment ให้ถือเป็น unpaid / รอชำระ
-   */
-  if (
-    paymentStatus === "unpaid" ||
-    rawPaymentStatus === "unpaid" ||
-    rawPaymentStatus === "partially_paid" ||
-    transactionStatus === "pending" ||
-    transactionStatus === "partially_paid" ||
-    transactionStatus === "cancelled" ||
-    transactionStatus === "void"
-  ) {
-    return "unpaid";
-  }
-
-  if (
-    typeof item.remainingAmount === "number" &&
-    item.remainingAmount <= 0 &&
-    typeof item.totalPaid === "number" &&
-    item.totalPaid > 0
-  ) {
-    return "paid";
-  }
-
-  if (
-    typeof item.outstandingBalance === "number" &&
-    item.outstandingBalance <= 0
-  ) {
-    return "paid";
-  }
-
-  return "unpaid";
+  return item.amount.remaining <= 0 || item.status === "paid" || item.status === "completed"
+    ? "paid"
+    : "unpaid";
 }
 
 function normalizeTransaction(item: RawTransactionItem): TransactionItem {
   const lastPayment = getLastPayment(item);
 
   return {
-    id: item.id ?? "",
-    billNo: item.billNo ?? "-",
-    plateNo: item.plateNo ?? "-",
-    vehicleType: item.vehicleType ?? "-",
-    serviceType: item.serviceType ?? "-",
-    entryAt: item.entryAt ?? "",
-    exitAt: item.exitAt ?? "",
-    durationMinute: item.durationMinute ?? item.totalMinutes ?? 0,
-    amount: item.amount ?? item.baseAmount ?? 0,
-    vat: item.vat ?? 0,
-    discount: item.discount ?? 0,
-    netAmount: item.netAmount ?? 0,
-    status: item.status ?? "pending",
+    id: item.id,
+    billNo: item.billNo,
+    plateNo: item.plateNo,
+    vehicleType: item.vehicleType,
+    entryAt: item.entryAt,
+    exitAt: item.exitAt,
+    netAmount: item.amount.net,
+    status: item.status,
     payment: {
       status: mapPaymentStatus(item),
-      method:
-        item.payment?.method ??
-        item.paymentMethod ??
-        lastPayment?.method ??
-        lastPayment?.channel ??
-        null,
-      paidAt: item.payment?.paidAt ?? lastPayment?.paidAt ?? null,
-      qrCodeText: item.payment?.qrCodeText ?? null,
-      qrCodeImageUrl: item.payment?.qrCodeImageUrl ?? null,
-      referenceNo:
-        item.payment?.referenceNo ?? lastPayment?.referenceNo ?? null,
+      method: lastPayment?.method ?? null,
+      paidAt: lastPayment?.paidAt ?? null,
     },
-    receipt: {
-      receiptNo: item.receipt?.receiptNo ?? null,
-      issuedAt: item.receipt?.issuedAt ?? null,
-      footerText: item.receipt?.footerText ?? null,
-      printableText: item.receipt?.printableText ?? null,
-    },
-    createdAt: item.createdAt ?? "",
-    updatedAt: item.updatedAt ?? "",
   };
 }
 
@@ -303,7 +196,7 @@ function CheckPaymentPage() {
 
       setProgress(18);
 
-      const response = await fetch("/api/check-payment/transactions", {
+      const response = await fetch("/api/check-payment/transactions?all=true", {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -314,7 +207,7 @@ function CheckPaymentPage() {
 
       setProgress(60);
 
-      const raw: unknown = await response.json().catch(() => null);
+      const raw = (await response.json().catch(() => null)) as TransactionListApiResponse | null;
 
       setProgress(82);
 
@@ -414,7 +307,7 @@ function CheckPaymentPage() {
       const token = localStorage.getItem("token");
 
       const response = await fetch(
-        `/api/check-payment/transactions/${id}/status`,
+        `/api/check-payment/transactions/${id}`,
         {
           method: "PATCH",
           headers: {

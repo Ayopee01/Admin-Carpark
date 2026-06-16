@@ -9,6 +9,7 @@ export type SystemGeneralSettings = {
     location: string;
     language: SystemLanguage;
     timezone: SystemTimezone;
+    frontendUrl?: string;
 };
 
 export type EntryBillSettings = {
@@ -24,6 +25,7 @@ export type PaymentBillSettings = EntryBillSettings & {
 };
 
 export type ReceiptSettings = {
+    configUpdatedAt?: string;
     entryBill: EntryBillSettings;
     paymentBill: PaymentBillSettings;
     paperWidth: PaperWidth;
@@ -39,6 +41,7 @@ export type BillingSettings = {
 };
 
 export type SystemSettings = {
+    configUpdatedAt?: string;
     general: SystemGeneralSettings;
     receipt: ReceiptSettings;
     billing: BillingSettings;
@@ -47,7 +50,23 @@ export type SystemSettings = {
     action?: string;
 };
 
-export type SystemSettingsResponse = SystemSettings;
+export type SystemSettingsResponse = {
+    configUpdatedAt: string | null;
+    general: {
+        systemName: string | null;
+        location: string | null;
+        language: string | null;
+        timezone: string | null;
+        frontendUrl: string | null;
+    };
+    receipt: ReceiptSettings;
+    billing: Record<string, unknown> & {
+        taxEnabled?: boolean;
+        currency?: string;
+        roundingMode?: string;
+    };
+    updatedAt?: string;
+};
 
 export type UpdateSystemSettingsPayload = Partial<{
     general: Partial<SystemGeneralSettings>;
@@ -58,8 +77,8 @@ export type UpdateSystemSettingsPayload = Partial<{
 }>;
 
 export type UpdateSystemSettingsResponse = {
+    success: boolean;
     message: string;
-    settings: SystemSettings;
 };
 
 export type ReceiptSettingsResponse = ReceiptSettings;
@@ -74,14 +93,32 @@ export type UpdateReceiptSettingsPayload = Partial<{
 }>;
 
 export type UpdateReceiptSettingsResponse = {
+    success: boolean;
     message: string;
-    receipt: ReceiptSettings;
+};
+
+export type PrinterSettings = {
+    configUpdatedAt: string | null;
+    fontSize?: number;
+    billNumberFontSize?: number;
+    paperWidth?: number;
+};
+
+export type PrinterUpdateRequest = {
+    fontSize?: number;
+    billNumberFontSize?: number;
+    paperWidth?: number;
+};
+
+export type PrinterUpdateResponse = {
+    message: string;
+    printer: PrinterSettings;
 };
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
     general: {
-        systemName: "Smart Carpark",
-        location: "อาคารผู้โดยสาร A-12",
+        systemName: "",
+        location: "",
         language: "th",
         timezone: "Asia/Bangkok",
     },
@@ -101,7 +138,7 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
             expiryDuration: 15,
         },
         paperWidth: "80mm",
-        footerText: "ขอบคุณที่ใช้บริการ",
+        footerText: "",
     },
     billing: {
         taxEnabled: false,

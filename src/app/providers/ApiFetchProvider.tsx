@@ -55,6 +55,13 @@ function shouldRefresh(status: number) {
     return status === 401;
 }
 
+function notifyForbidden(response: Response) {
+    if (response.status !== 403 || typeof window === "undefined") return;
+    void response.clone().json().catch(() => null).then((data) => {
+        window.dispatchEvent(new CustomEvent("api-forbidden", { detail: data }));
+    });
+}
+
 function isAuthApiPath(pathname: string) {
     return pathname === "/api/auth/login" || pathname === "/api/auth/refresh";
 }
@@ -197,6 +204,7 @@ function ApiFetchProvider({ children }: Props) {
             );
 
             if (!shouldRefresh(firstResponse.status)) {
+                notifyForbidden(firstResponse);
                 return firstResponse;
             }
 
@@ -211,6 +219,8 @@ function ApiFetchProvider({ children }: Props) {
                 if (shouldRefresh(retryResponse.status)) {
                     redirectToLogin();
                 }
+
+                notifyForbidden(retryResponse);
 
                 return retryResponse;
             } catch (error) {

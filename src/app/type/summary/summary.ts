@@ -36,11 +36,11 @@ export type OverviewServiceSummaryItem = {
 
 export type OverviewSummaryResponse = {
     filters: OverviewFilters;
-    chartFilters?: OverviewFilters;
+    chartFilters: OverviewFilters;
     summaryCards: OverviewSummaryCards;
     revenueGroups: OverviewRevenueGroup[];
-    usageChartMode?: OverviewUsageChartMode;
-    usageChartLabel?: string;
+    usageChartMode: OverviewUsageChartMode;
+    usageChartLabel: string;
     usageChart: OverviewUsageChartItem[];
     serviceSummary: OverviewServiceSummaryItem[];
     totalSummaryCalculated: number;

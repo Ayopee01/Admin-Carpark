@@ -4,17 +4,27 @@ export type ServiceChannelIcon = "user" | "vending" | "qr" | "gate" | string;
 export type PaymentMethod = {
     id: string;
     label: string;
-    icon: PaymentMethodIcon;
+    icon?: PaymentMethodIcon;
     isActive: boolean;
     method?: string;
     action?: string;
 };
 
+export type PaymentMethodsResponse = {
+    configUpdatedAt: string | null;
+    data: PaymentMethod[];
+};
+
 export type ServiceChannel = {
     id: string;
     name: string;
-    icon: ServiceChannelIcon;
+    icon?: ServiceChannelIcon;
     allowedMethods: string[];
+};
+
+export type ServiceChannelsResponse = {
+    configUpdatedAt: string | null;
+    data: ServiceChannel[];
 };
 
 export type UpdatePaymentMethodPayload = {

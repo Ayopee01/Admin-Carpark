@@ -1,18 +1,16 @@
 export type ThemeConfig = {
-    themeName: string;
-    primaryColor: string;
-    secondaryColor: string;
-    accentColor: string;
+    themeColor: string | null;
     logoUrl: string | null;
-    updatedAt: string;
+    configUpdatedAt: string | null;
+    themeMode?: string | null;
+    customThemeColor?: string | null;
+    updatedAt?: string;
 };
 
 export type ThemePayload = {
-    themeName: string;
-    primaryColor: string;
-    secondaryColor: string;
-    accentColor: string;
-    logoUrl: string | null;
+    themeColor: string;
+    themeMode?: string;
+    customThemeColor?: string | null;
 };
 
 export type ThemeUploadLogoResponse = {
@@ -24,4 +22,10 @@ export type ThemeUploadLogoResponse = {
         logoUrl?: string | null;
         url?: string | null;
     };
+};
+
+export type ThemeDeleteLogoResponse = {
+    message?: string;
+    logoUrl?: string | null;
+    theme?: ThemeConfig;
 };

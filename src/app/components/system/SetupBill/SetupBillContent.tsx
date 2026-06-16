@@ -33,9 +33,11 @@ function SetupBillContent() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    async function fetchSystemSettings() {
+    async function fetchSystemSettings(showLoading = true) {
         try {
-            setLoading(true);
+            if (showLoading) {
+                setLoading(true);
+            }
             setError("");
             setSuccess("");
 
@@ -81,10 +83,14 @@ function SetupBillContent() {
 
             setSettings(nextSettings);
             setDraft(nextSettings);
+            return nextSettings;
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+            return null;
         } finally {
-            setLoading(false);
+            if (showLoading) {
+                setLoading(false);
+            }
         }
     }
 
@@ -132,10 +138,7 @@ function SetupBillContent() {
                 throw new Error(getErrorMessage(result, "บันทึกข้อมูลตั้งค่าระบบไม่สำเร็จ"));
             }
 
-            const saved = result?.settings ?? draft;
-
-            setSettings(saved);
-            setDraft(saved);
+            await fetchSystemSettings(false);
             setSuccess("บันทึกข้อมูลตั้งค่าระบบเรียบร้อยแล้ว");
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");

@@ -61,10 +61,11 @@ function DevicePage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    setProgress(8);
-
     const timers = [
+      window.setTimeout(() => {
+        setLoading(true);
+        setProgress(8);
+      }, 0),
       window.setTimeout(() => setProgress(18), 120),
       window.setTimeout(() => setProgress(60), 260),
       window.setTimeout(() => setProgress(82), 420),

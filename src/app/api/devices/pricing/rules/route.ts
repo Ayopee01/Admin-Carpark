@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
         const authorization = req.headers.get("authorization");
         const body = await req.json().catch(() => null);
 
-        const response = await fetch(`${baseUrl}/api/v1/service-pricing/rules`, {
+        const response = await fetch(`${baseUrl}/api/v1/service-pricing/config`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

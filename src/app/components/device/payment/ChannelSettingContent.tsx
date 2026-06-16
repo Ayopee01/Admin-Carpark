@@ -14,7 +14,9 @@ import {
 import ChannelMappingModal from "@/src/app/components/device/payment/ChannelMappingModal";
 import type {
     PaymentMethod,
+    PaymentMethodsResponse,
     ServiceChannel,
+    ServiceChannelsResponse,
 } from "@/src/app/type/device/payment";
 
 const ADD_CHANNEL_ID = "__add_channel__";
@@ -36,7 +38,7 @@ function getErrorMessage(value: unknown, fallback: string) {
     return fallback;
 }
 
-function getPaymentMethodIcon(icon: string) {
+function getPaymentMethodIcon(icon?: string) {
     switch (icon) {
         case "cash":
             return <LuUser size={18} />;
@@ -51,7 +53,7 @@ function getPaymentMethodIcon(icon: string) {
     }
 }
 
-function getChannelIcon(icon: string) {
+function getChannelIcon(icon?: string) {
     switch (icon) {
         case "user":
             return <LuUser size={18} />;
@@ -66,6 +68,22 @@ function getChannelIcon(icon: string) {
     }
 }
 
+function getMethods(value: unknown) {
+    if (Array.isArray(value)) return value as PaymentMethod[];
+
+    const response = value as PaymentMethodsResponse | null;
+
+    return response?.data ?? [];
+}
+
+function getChannels(value: unknown) {
+    if (Array.isArray(value)) return value as ServiceChannel[];
+
+    const response = value as ServiceChannelsResponse | null;
+
+    return response?.data ?? [];
+}
+
 function ChannelSettingContent() {
     const [methods, setMethods] = useState<PaymentMethod[]>([]);
     const [channels, setChannels] = useState<ServiceChannel[]>([]);
@@ -77,9 +95,11 @@ function ChannelSettingContent() {
     const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
-    async function fetchPaymentSettings() {
+    async function fetchPaymentSettings(showLoading = true) {
         try {
-            setLoading(true);
+            if (showLoading) {
+                setLoading(true);
+            }
             setError("");
 
             const token = getToken();
@@ -114,12 +134,16 @@ function ChannelSettingContent() {
                 );
             }
 
-            setMethods(Array.isArray(methodsJson) ? methodsJson : []);
-            setChannels(Array.isArray(channelsJson) ? channelsJson : []);
+            setMethods(getMethods(methodsJson));
+            setChannels(getChannels(channelsJson));
+            return true;
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+            return null;
         } finally {
-            setLoading(false);
+            if (showLoading) {
+                setLoading(false);
+            }
         }
     }
 

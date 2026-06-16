@@ -3,17 +3,19 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { LuBanknote, LuQrCode, LuX } from "react-icons/lu";
+import type {
+  AdminPaymentResponse,
+  PaymentRequest,
+  TransactionDetail,
+} from "@/src/app/type/check-payment/transactions";
+import type {
+  PaymentMethodsResponse,
+  ServiceChannelsResponse,
+} from "@/src/app/type/device/payment";
 
 type PaymentStatus = "paid" | "unpaid";
 
 type RawPaymentStatus = PaymentStatus | "pending" | "completed" | "cancelled";
-
-type PaymentItem = {
-  id?: string;
-  method?: string | null;
-  amount?: number;
-  paidAt?: string | null;
-};
 
 type TransactionDetailResponse = {
   id: string;
@@ -33,53 +35,7 @@ type TransactionDetailResponse = {
   };
 };
 
-type RawTransactionDetailResponse = {
-  id: string;
-  billNo?: string;
-  plateNo?: string;
-
-  vehicleType?: string;
-  serviceType?: string;
-  entryAt?: string | null;
-  exitAt?: string | null;
-  calculatedAt?: string | null;
-  exitTimeLimit?: string | null;
-  isOverstay?: boolean;
-
-  status?: RawPaymentStatus;
-  baseAmount?: number;
-  netAmount?: number;
-  totalPaid?: number;
-  remainingAmount?: number;
-  serviceDisplay?: string;
-  durationHour?: number;
-  totalMinutes?: number;
-
-  // เผื่อ backend เก่ายังส่ง durationMinute มา
-  durationMinute?: number;
-
-  payments?: PaymentItem[];
-
-  payment?: {
-    status?: RawPaymentStatus;
-    method?: string | null;
-    qrCodeText?: string | null;
-    qrCodeImageUrl?: string | null;
-  };
-
-  paymentStatus?: RawPaymentStatus;
-  paymentMethod?: string | null;
-  qrCodeText?: string | null;
-  qrCodeImageUrl?: string | null;
-
-  receiptPreview?: {
-    printableText?: string | null;
-    canPrint?: boolean;
-  };
-
-  createdAt?: string;
-  updatedAt?: string;
-};
+type RawTransactionDetailResponse = TransactionDetail;
 
 type PaymentMode = "qr" | "cash";
 
@@ -100,36 +56,25 @@ function formatDurationHour(hours: number) {
 }
 
 function normalizeDetail(raw: RawTransactionDetailResponse): TransactionDetailResponse {
-  const firstPayment = raw.payments?.[0];
+  const latestPayment = raw.payments.at(-1);
 
   return {
     id: raw.id,
-    billNo: raw.billNo ?? "-",
-    plateNo: raw.plateNo ?? "-",
-
-    // ใช้ durationHour จาก API ใหม่เป็นหลัก
-    durationHour:
-      raw.durationHour ??
-      Math.ceil((raw.totalMinutes ?? raw.durationMinute ?? 0) / 60),
-
-    netAmount: raw.netAmount ?? 0,
+    billNo: raw.billNo,
+    plateNo: raw.plateNo,
+    durationHour: raw.durationHour,
+    netAmount: raw.remainingAmount,
 
     payment: {
-      status: normalizePaymentStatus(
-        raw.payment?.status ?? raw.paymentStatus ?? raw.status
-      ),
-      method:
-        raw.payment?.method ??
-        raw.paymentMethod ??
-        firstPayment?.method ??
-        null,
-      qrCodeText: raw.payment?.qrCodeText ?? raw.qrCodeText ?? null,
-      qrCodeImageUrl: raw.payment?.qrCodeImageUrl ?? raw.qrCodeImageUrl ?? null,
+      status: normalizePaymentStatus(raw.status as RawPaymentStatus),
+      method: latestPayment?.method ?? null,
+      qrCodeText: raw.qrData || null,
+      qrCodeImageUrl: null,
     },
 
     receiptPreview: {
-      printableText: raw.receiptPreview?.printableText ?? null,
-      canPrint: raw.receiptPreview?.canPrint ?? false,
+      printableText: null,
+      canPrint: false,
     },
   };
 }
@@ -145,6 +90,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [availableMethods, setAvailableMethods] = useState<PaymentMode[]>([]);
 
   useEffect(() => {
     if (!open || !transactionId) return;
@@ -161,6 +107,15 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         setCashReceived("0");
 
         const token = localStorage.getItem("token");
+
+        const settingsPromise = Promise.all([
+          fetch("/api/devices/payment/methods", {
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          }),
+          fetch("/api/devices/payment/channels", {
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          }),
+        ]);
 
         const res = await fetch(`/api/check-payment/transactions/${transactionId}`, {
           method: "GET",
@@ -183,10 +138,28 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         }
 
         const normalized = normalizeDetail(json);
+        const [methodsResponse, channelsResponse] = await settingsPromise;
+        const methodsJson = (await methodsResponse.json().catch(() => null)) as PaymentMethodsResponse | null;
+        const channelsJson = (await channelsResponse.json().catch(() => null)) as ServiceChannelsResponse | null;
+        const activeMethodIds = new Set(
+          (methodsJson?.data ?? []).filter((item) => item.isActive).map((item) => item.id)
+        );
+        const cashierChannel = (channelsJson?.data ?? []).find(
+          (item) => item.id === "cashier" || item.name.toLowerCase().includes("cashier")
+        );
+        const allowed = (cashierChannel?.allowedMethods ?? []).filter(
+          (method): method is PaymentMode =>
+            (method === "cash" || method === "qr") && activeMethodIds.has(method)
+        );
 
         if (!ignore) {
           setDetail(normalized);
-          setMode(normalized.payment.method === "cash" ? "cash" : "qr");
+          setAvailableMethods(allowed);
+          setMode(
+            allowed.includes(normalized.payment.method === "cash" ? "cash" : "qr")
+              ? normalized.payment.method === "cash" ? "cash" : "qr"
+              : allowed[0] ?? "qr"
+          );
 
           // ไม่อิง netAmount แล้ว ให้ admin กรอกเองทุกครั้ง
           setCashReceived("0");
@@ -223,11 +196,21 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
       setSubmitting(true);
       setError("");
 
+      if (!availableMethods.includes(mode)) {
+        throw new Error("ช่องทางชำระเงินนี้ไม่ได้เปิดใช้งาน");
+      }
+
       const token = localStorage.getItem("token");
 
       if (mode === "cash" && receivedAmount < detail.netAmount) {
         throw new Error("จำนวนเงินรับน้อยกว่ายอดชำระ");
       }
+
+      const payload: PaymentRequest = {
+        method: mode,
+        channel: "cashier",
+        amount: detail.netAmount,
+      };
 
       const response = await fetch(
         `/api/check-payment/transactions/${detail.id}/payment`,
@@ -237,22 +220,11 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify(
-            mode === "qr"
-              ? {
-                method: "qr",
-                printReceipt,
-              }
-              : {
-                method: "cash",
-                receivedAmount,
-                printReceipt,
-              }
-          ),
+          body: JSON.stringify(payload),
         }
       );
 
-      const result = await response.json().catch(() => null);
+      const result = (await response.json().catch(() => null)) as AdminPaymentResponse | null;
 
       if (!response.ok) {
         throw new Error(result?.message || "ไม่สามารถยืนยันการชำระเงินได้");
@@ -350,6 +322,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                 <button
                   type="button"
                   onClick={() => setMode("qr")}
+                  disabled={!availableMethods.includes("qr")}
                   className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${mode === "qr"
                       ? "border-[#8CC2FF] bg-[#EEF5FD]"
                       : "border-transparent bg-[#EFF1F3]"
@@ -366,6 +339,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                 <button
                   type="button"
                   onClick={() => setMode("cash")}
+                  disabled={!availableMethods.includes("cash")}
                   className={`flex min-h-[92px] flex-col items-center justify-center rounded-2xl border px-4 py-4 transition ${mode === "cash"
                       ? "border-[#8CC2FF] bg-[#EEF5FD]"
                       : "border-transparent bg-[#EFF1F3]"

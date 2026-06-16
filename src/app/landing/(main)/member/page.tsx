@@ -31,6 +31,7 @@ import type {
   MemberStats,
   MemberStatus,
 } from "@/src/app/type/member/member";
+import type { Permission } from "@/src/app/type/common";
 
 const PERMISSIONS: PermissionItem[] = [
   {
@@ -103,17 +104,15 @@ function splitFullName(fullName: string) {
 function getMemberFullName(member: Partial<Member>) {
   const firstName = member.firstName?.trim() ?? "";
   const lastName = member.lastName?.trim() ?? "";
-  const fullName = member.fullName?.trim() ?? "";
-
-  return `${firstName} ${lastName}`.trim() || fullName;
+  return `${firstName} ${lastName}`.trim();
 }
 
-function normalizePermissions(permissions?: string[]) {
+function normalizePermissions(permissions?: string[]): Permission[] {
   const selectedKeys = new Set(permissions ?? []);
 
   return PERMISSIONS.filter((permission) =>
     selectedKeys.has(permission.key)
-  ).map((permission) => permission.key);
+  ).map((permission) => permission.key as Permission);
 }
 
 function getToken() {
@@ -327,7 +326,7 @@ function MemberPage() {
   }, [members, search]);
 
   function handleStartEdit(member: Member) {
-    const fallbackName = splitFullName(member.fullName ?? "");
+    const fallbackName = splitFullName(getMemberFullName(member));
 
     setEditingId(member.id);
     setEditDraft({

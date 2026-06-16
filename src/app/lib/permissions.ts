@@ -12,8 +12,6 @@ export function hasPermission(
     if (!permission) return true;
     if (!user) return false;
 
-    if (user.role === "super_admin") return true;
-
     return Array.isArray(user.permissions) && user.permissions.includes(permission);
 }
 
@@ -22,8 +20,6 @@ export function hasAnyPermission(
     permissions: PermissionKey[]
 ) {
     if (!user) return false;
-
-    if (user.role === "super_admin") return true;
 
     if (!Array.isArray(user.permissions)) return false;
 

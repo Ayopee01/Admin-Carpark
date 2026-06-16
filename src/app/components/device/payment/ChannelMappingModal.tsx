@@ -15,7 +15,7 @@ type Props = {
     onSubmit: () => void;
 };
 
-function getMethodIcon(icon: string): ReactNode {
+function getMethodIcon(icon?: string): ReactNode {
     switch (icon) {
         case "cash":
             return <LuUser size={15} />;

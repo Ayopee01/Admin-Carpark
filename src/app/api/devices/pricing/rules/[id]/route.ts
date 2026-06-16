@@ -21,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         const authorization = req.headers.get("authorization");
         const body = await req.json().catch(() => null);
 
-        const response = await fetch(`${baseUrl}/api/v1/service-pricing/rules/${id}`, {
+        const response = await fetch(`${baseUrl}/api/v1/service-pricing/config/${id}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
@@ -56,7 +56,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
 
         const authorization = req.headers.get("authorization");
 
-        const response = await fetch(`${baseUrl}/api/v1/service-pricing/rules/${id}`, {
+        const response = await fetch(`${baseUrl}/api/v1/service-pricing/config/${id}`, {
             method: "DELETE",
             headers: {
                 "Content-Type": "application/json",

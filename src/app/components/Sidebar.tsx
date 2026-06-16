@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 // Icons
 import { LuLayoutDashboard, LuSearch, LuWalletCards, LuUsers, LuSlidersHorizontal, LuSettings2, LuChevronLeft, LuLogOut, LuX } from "react-icons/lu";
-import { FaParking } from "react-icons/fa";
 import { FiUser } from "react-icons/fi";
 // Types
 import type { PermissionKey, SidebarUser, SidebarMenuItem } from "@/src/app/type/auth/Permission";
@@ -75,8 +74,6 @@ function hasAnyPermission(
 ) {
   if (!user) return false;
 
-  if (user.role === "super_admin") return true;
-
   if (!Array.isArray(user.permissions)) return false;
 
   return permissions.some((permission) =>
@@ -87,7 +84,7 @@ function hasAnyPermission(
 /* -------------------- Component -------------------- */
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [user, setUser] = useState<SidebarUser | null>(null);
+  const [user, setUser] = useState<SidebarUser | null>(() => getStoredUser());
   const [openLogoutPopup, setOpenLogoutPopup] = useState(false);
 
   const pathname = usePathname();
@@ -101,10 +98,6 @@ function Sidebar() {
 
   useEffect(() => {
     const storedUser = getStoredUser();
-
-    if (storedUser) {
-      setUser(storedUser);
-    }
 
     async function fetchMe() {
       const token = localStorage.getItem("token");
@@ -144,19 +137,6 @@ function Sidebar() {
 
     fetchMe();
   }, [router]);
-
-  useEffect(() => {
-    if (!user) return;
-    if (visibleMenuItems.length === 0) return;
-
-    const canAccessCurrentPath = visibleMenuItems.some(
-      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
-    );
-
-    if (!canAccessCurrentPath) {
-      router.replace(visibleMenuItems[0].href);
-    }
-  }, [pathname, router, user, visibleMenuItems]);
 
   const closeLogoutConfirm = () => {
     setOpenLogoutPopup(false);

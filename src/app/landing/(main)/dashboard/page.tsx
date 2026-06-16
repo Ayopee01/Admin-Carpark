@@ -21,6 +21,7 @@ import type {
     DashboardChannelItem,
     DashboardResponse,
     DashboardRevenueGroup,
+    DashboardSseEvent,
 } from "@/src/app/type/dashboard/dashboard";
 
 function DashboardPage() {
@@ -101,6 +102,88 @@ function DashboardPage() {
             if (timer) {
                 window.clearTimeout(timer);
             }
+        };
+    }, []);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        let reconnectTimer: number | undefined;
+        let pollingTimer: number | undefined;
+
+        async function pollDashboard() {
+            try {
+                const response = await fetch("/api/dashboard", { signal: controller.signal });
+                if (response.ok) {
+                    setData((await response.json()) as DashboardResponse);
+                }
+            } catch {
+                // The next polling interval retries automatically.
+            }
+        }
+
+        function startPolling() {
+            if (pollingTimer) return;
+            void pollDashboard();
+            pollingTimer = window.setInterval(pollDashboard, 30000);
+        }
+
+        async function connect() {
+            try {
+                const token = localStorage.getItem("token");
+                const response = await fetch("/api/dashboard/events", {
+                    headers: {
+                        Accept: "text/event-stream",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    signal: controller.signal,
+                });
+                if (!response.ok || !response.body) throw new Error("SSE unavailable");
+
+                if (pollingTimer) {
+                    window.clearInterval(pollingTimer);
+                    pollingTimer = undefined;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                while (!controller.signal.aborted) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const chunks = buffer.split(/\r?\n\r?\n/);
+                    buffer = chunks.pop() ?? "";
+
+                    for (const chunk of chunks) {
+                        const dataText = chunk
+                            .split(/\r?\n/)
+                            .filter((line) => line.startsWith("data:"))
+                            .map((line) => line.slice(5).trim())
+                            .join("\n");
+                        if (!dataText) continue;
+                        const event = JSON.parse(dataText) as DashboardSseEvent;
+                        if (
+                            event.type === "dashboard_snapshot" ||
+                            event.type === "dashboard_summary" ||
+                            event.type === "dashboard_updated"
+                        ) {
+                            setData(event.data);
+                        }
+                    }
+                }
+            } catch {
+                if (controller.signal.aborted) return;
+                startPolling();
+                reconnectTimer = window.setTimeout(connect, 5000);
+            }
+        }
+
+        void connect();
+        return () => {
+            controller.abort();
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            if (pollingTimer) window.clearInterval(pollingTimer);
         };
     }, []);
 
@@ -251,13 +334,13 @@ function DashboardPage() {
                     <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         {data.channelBreakdown.map((channel) => (
                             <ChannelCard
-                                key={channel.code}
+                                key={channel.id ?? channel.code ?? channel.label}
                                 title={channel.label}
-                                subTitle={channel.subLabel}
+                                subTitle={channel.subLabel ?? ""}
                                 countText={`${channel.count} รายการ`}
                                 amountText={formatCurrency(channel.amount)}
                                 percent={channel.percent}
-                                icon={getChannelIcon(channel.icon)}
+                                icon={getChannelIcon(channel.icon ?? "")}
                             />
                         ))}
                     </div>

@@ -10,13 +10,40 @@ import type {
 } from "@/src/app/type/device/pricing";
 
 const DEFAULT_FORM: PricingRulePayload = {
-    serviceType: "parking",
+    name: "Base hour",
+    feeType: "base_hour",
     vehicleType: "car",
+    baseHours: 1,
     hourStart: 1,
     hourEnd: 1,
+    periodUnit: null,
+    periodStart: 0,
+    periodEnd: null,
     price: 0,
     status: "active",
 };
+
+const DEFAULT_SERVICE_PRICING_CONFIG: ServicePricingConfig = {
+    configUpdatedAt: null,
+    pricingRules: [],
+};
+const FEE_TYPES = [
+    { code: "base_hour", label: "Base hour" },
+    { code: "next_hour", label: "Next hour" },
+    { code: "overnight_day", label: "Overnight day" },
+    { code: "overnight_week", label: "Overnight week" },
+    { code: "overnight_month", label: "Overnight month" },
+    { code: "overnight_year", label: "Overnight year" },
+];
+const VEHICLE_TYPES = [
+    { code: "car", label: "รถยนต์" },
+    { code: "motorcycle", label: "รถจักรยานยนต์" },
+];
+
+type ServicePricingApiResponse = {
+    success?: boolean;
+    data?: Partial<ServicePricingConfig>;
+} & Partial<ServicePricingConfig>;
 
 function getToken() {
     return typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -35,9 +62,24 @@ function getErrorMessage(value: unknown, fallback: string) {
     return fallback;
 }
 
+function normalizeServicePricingConfig(
+    value: ServicePricingApiResponse | null
+): ServicePricingConfig {
+    const responseData: Partial<ServicePricingConfig> =
+        value && typeof value === "object" && "data" in value && value.data
+            ? value.data
+            : value ?? {};
+
+    return {
+        configUpdatedAt: responseData.configUpdatedAt ?? null,
+        pricingRules: responseData.pricingRules ?? [],
+    };
+}
+
 function PricingPage() {
-    const [config, setConfig] = useState<ServicePricingConfig | null>(null);
-    const [activeTab, setActiveTab] = useState("pricing");
+    const [config, setConfig] = useState<ServicePricingConfig>(
+        DEFAULT_SERVICE_PRICING_CONFIG
+    );
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -47,9 +89,11 @@ function PricingPage() {
     const [form, setForm] = useState<PricingRulePayload>(DEFAULT_FORM);
     const [submitting, setSubmitting] = useState(false);
 
-    async function fetchConfig() {
+    async function fetchConfig(showLoading = true) {
         try {
-            setLoading(true);
+            if (showLoading) {
+                setLoading(true);
+            }
             setError("");
 
             const token = getToken();
@@ -62,17 +106,26 @@ function PricingPage() {
                 cache: "no-store",
             });
 
-            const result = await response.json().catch(() => null);
+            const result = (await response.json().catch(() => null)) as
+                | ServicePricingApiResponse
+                | null;
 
             if (!response.ok) {
                 throw new Error(getErrorMessage(result, "โหลดข้อมูลค่าบริการไม่สำเร็จ"));
             }
 
-            setConfig(result as ServicePricingConfig);
+            const normalizedConfig = normalizeServicePricingConfig(result);
+
+            setConfig(normalizedConfig);
+            return normalizedConfig;
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+            setConfig(DEFAULT_SERVICE_PRICING_CONFIG);
+            return null;
         } finally {
-            setLoading(false);
+            if (showLoading) {
+                setLoading(false);
+            }
         }
     }
 
@@ -81,16 +134,17 @@ function PricingPage() {
     }, []);
 
     const pricingRules = useMemo(() => {
-        if (!config) return [];
-        return [...config.pricingRules]
+        return [...(config.pricingRules ?? [])]
             .filter((rule) => rule.vehicleType === "car")
             .sort((a, b) => a.hourStart - b.hourStart);
-    }, [config]);
+    }, [config.pricingRules]);
 
-    function getServiceLabel(code: string) {
+    function getServiceLabel(code?: string | null) {
         return (
-            config?.masterData.serviceTypes.find((item) => item.code === code)?.label ??
-            code
+            FEE_TYPES.find((item) => item.code === code)
+                ?.label ??
+            code ??
+            "-"
         );
     }
 
@@ -99,7 +153,6 @@ function PricingPage() {
         setEditingId(null);
         setForm({
             ...DEFAULT_FORM,
-            serviceType: config?.masterData.serviceTypes[0]?.code ?? "parking",
             vehicleType: "car",
         });
         setOpenModal(true);
@@ -109,10 +162,15 @@ function PricingPage() {
         setModalMode("edit");
         setEditingId(rule.id);
         setForm({
-            serviceType: rule.serviceType,
-            vehicleType: "car",
+            name: rule.name,
+            feeType: rule.feeType,
+            vehicleType: rule.vehicleType,
+            baseHours: rule.baseHours,
             hourStart: rule.hourStart,
             hourEnd: rule.hourEnd,
+            periodUnit: rule.periodUnit,
+            periodStart: rule.periodStart,
+            periodEnd: rule.periodEnd,
             price: rule.price,
             status: rule.status,
         });
@@ -125,7 +183,6 @@ function PricingPage() {
             setError("");
 
             const token = getToken();
-
             const url =
                 modalMode === "edit" && editingId
                     ? `/api/devices/pricing/rules/${editingId}`
@@ -133,7 +190,6 @@ function PricingPage() {
 
             const payload: PricingRulePayload = {
                 ...form,
-                vehicleType: "car",
             };
 
             const response = await fetch(url, {
@@ -152,7 +208,7 @@ function PricingPage() {
             }
 
             setOpenModal(false);
-            await fetchConfig();
+            await fetchConfig(false);
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         } finally {
@@ -169,7 +225,6 @@ function PricingPage() {
             setError("");
 
             const token = getToken();
-
             const response = await fetch(`/api/devices/pricing/rules/${id}`, {
                 method: "DELETE",
                 headers: {
@@ -183,7 +238,7 @@ function PricingPage() {
                 throw new Error(getErrorMessage(result, "ลบข้อมูลไม่สำเร็จ"));
             }
 
-            await fetchConfig();
+            await fetchConfig(false);
         } catch (err) {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         }
@@ -238,7 +293,7 @@ function PricingPage() {
                                         <div>
                                             <p className="text-[16px] text-[#1F2937]">
                                                 ราคาสำหรับ {rule.hourStart} ถึง {rule.hourEnd} ชั่วโมง •{" "}
-                                                {getServiceLabel(rule.serviceType)}
+                                                {getServiceLabel(rule.feeType)}
                                             </p>
 
                                             <p className="mt-3 text-[30px] font-bold text-[#061D36]">
@@ -282,8 +337,8 @@ function PricingPage() {
                 open={openModal}
                 mode={modalMode}
                 form={form}
-                serviceTypes={config?.masterData.serviceTypes ?? []}
-                vehicleTypes={config?.masterData.vehicleTypes ?? []}
+                serviceTypes={FEE_TYPES}
+                vehicleTypes={VEHICLE_TYPES}
                 submitting={submitting}
                 onClose={() => setOpenModal(false)}
                 onChange={setForm}

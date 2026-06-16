@@ -19,7 +19,8 @@ type Props = {
   onSaveEdit: (id: string) => void;
 };
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string | null) {
+  if (!value) return "-";
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) return "-";

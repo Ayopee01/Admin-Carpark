@@ -32,7 +32,7 @@ const menuItems: {
         {
             key: "channels",
             label: "ช่องทางการชำระค่าบริการ",
-            permission: "devices",
+            permission: "pricing",
         },
         {
             key: "theme",

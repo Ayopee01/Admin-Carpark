@@ -3,7 +3,6 @@
 import { LuX } from "react-icons/lu";
 import type {
     MasterDataItem,
-    PricingRule,
     PricingRulePayload,
 } from "@/src/app/type/device/pricing";
 
@@ -56,9 +55,12 @@ function PricingRuleModal({
                     </label>
 
                     <select
-                        value={form.serviceType}
+                        value={form.feeType}
                         onChange={(event) =>
-                            onChange((prev) => ({ ...prev, serviceType: event.target.value }))
+                            onChange((prev) => ({
+                                ...prev,
+                                feeType: event.target.value as PricingRulePayload["feeType"],
+                            }))
                         }
                         className="col-span-2 h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none"
                     >
@@ -70,9 +72,12 @@ function PricingRuleModal({
                     </select>
 
                     <select
-                        value={form.vehicleType}
+                        value={form.vehicleType ?? "car"}
                         onChange={(event) =>
-                            onChange((prev) => ({ ...prev, vehicleType: event.target.value }))
+                            onChange((prev) => ({
+                                ...prev,
+                                vehicleType: event.target.value as PricingRulePayload["vehicleType"],
+                            }))
                         }
                         className="col-span-2 h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none"
                     >
@@ -90,7 +95,7 @@ function PricingRuleModal({
                         <input
                             type="number"
                             min={1}
-                            value={form.hourStart}
+                            value={form.hourStart ?? 1}
                             onChange={(event) =>
                                 onChange((prev) => ({
                                     ...prev,
@@ -108,7 +113,7 @@ function PricingRuleModal({
                         <input
                             type="number"
                             min={1}
-                            value={form.hourEnd}
+                            value={form.hourEnd ?? ""}
                             onChange={(event) =>
                                 onChange((prev) => ({
                                     ...prev,
