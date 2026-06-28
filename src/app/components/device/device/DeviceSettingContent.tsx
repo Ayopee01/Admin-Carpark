@@ -15,8 +15,6 @@ import DeviceModal from "@/src/app/components/device/device/DeviceModal";
 import type {
     DeviceItem,
     DeviceActivationCodeCreateResponse,
-    CameraProvisionResponse,
-    PrinterProvisionResponse,
     DeviceMasterItem,
     DevicePayload,
     DevicesConfigResponse,
@@ -36,12 +34,6 @@ const ACTIVATION_DEVICE_TYPES = DEVICE_TYPES.filter(
     (item) =>
         item.code === KIOSK_DEVICE_TYPE ||
         item.code === BARRIER_GATE_DEVICE_TYPE
-);
-const CAMERA_PROVISION_DEVICE_TYPES = DEVICE_TYPES.filter(
-    (item) => item.code === CAMERA_DEVICE_TYPE
-);
-const PRINTER_PROVISION_DEVICE_TYPES = DEVICE_TYPES.filter(
-    (item) => item.code === PRINTER_DEVICE_TYPE
 );
 const CONNECTION_TYPES: DeviceMasterItem[] = [
     { code: "lan", label: "LAN" },
@@ -66,8 +58,6 @@ type DeviceActivationResult = Partial<DeviceActivationCodeCreateResponse> & {
     message?: string;
     deviceId?: string | null;
     success?: boolean;
-    device?: CameraProvisionResponse["device"] | PrinterProvisionResponse["device"];
-    deviceToken?: string;
 };
 
 type DeviceEventPayload = {
@@ -160,24 +150,13 @@ function toDevicePayload(form: DevicePayload): DevicePayload {
         note: form.note,
     };
 
-    if (isActivationDeviceType(form.deviceType) || isCameraType(form.deviceType)) {
+    if (isActivationDeviceType(form.deviceType)) {
         payload.location = form.location?.trim() || null;
     }
 
-    if (isCameraType(form.deviceType) || isBarrierGateType(form.deviceType)) {
+    if (isBarrierGateType(form.deviceType)) {
         payload.gateId = form.gateId?.trim() || null;
         payload.direction = form.direction || null;
-    }
-
-    if (isCameraType(form.deviceType)) {
-        payload.cameraRole = form.cameraRole?.trim() || null;
-    }
-
-    if (isPrinterType(form.deviceType)) {
-        payload.printerRole = form.printerRole?.trim() || null;
-    }
-
-    if (isBarrierGateType(form.deviceType)) {
         payload.cameraIds = form.cameraIds ?? [];
     }
 
@@ -221,7 +200,7 @@ function DevicesPage() {
     const [message, setMessage] = useState("");
 
     const [openModal, setOpenModal] = useState(false);
-    const [modalMode, setModalMode] = useState<"create" | "edit" | "provision">("create");
+    const [modalMode, setModalMode] = useState<"create" | "edit">("create");
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<DevicePayload>(DEFAULT_FORM);
     const [submitting, setSubmitting] = useState(false);
@@ -328,7 +307,6 @@ function DevicesPage() {
                     eventType === "device_activated" ||
                     eventType === "device_activation_success" ||
                     eventType === "device_activation_completed" ||
-                    eventType === "device_provisioned" ||
                     eventType === "device_deleted" ||
                     eventType === "devices_config_updated"
                 ) {
@@ -440,6 +418,35 @@ function DevicesPage() {
     }, []);
 
     const devices = useMemo(() => config?.devices ?? [], [config]);
+    const cameraOwnerById = useMemo(() => {
+        const ownerById = new Map<string, DeviceItem>();
+
+        devices
+            .filter((device) => isBarrierGateType(device.deviceType))
+            .forEach((device) => {
+                (device.cameraIds ?? []).forEach((cameraId) => {
+                    if (cameraId) {
+                        ownerById.set(cameraId, device);
+                    }
+                });
+            });
+
+        return ownerById;
+    }, [devices]);
+    const printerOwnersById = useMemo(() => {
+        const ownersById = new Map<string, DeviceItem[]>();
+
+        devices
+            .filter((device) => isKioskType(device.deviceType) || isBarrierGateType(device.deviceType))
+            .forEach((device) => {
+                (device.printerIds ?? []).forEach((printerId) => {
+                    if (!printerId) return;
+                    ownersById.set(printerId, [...(ownersById.get(printerId) ?? []), device]);
+                });
+            });
+
+        return ownersById;
+    }, [devices]);
     const displayedDevices = useMemo(() => {
         if (deviceTypeFilter === "all") {
             return devices;
@@ -471,24 +478,12 @@ function DevicesPage() {
     }, []);
 
     const modalDeviceTypes = useMemo(() => {
-        if (modalMode === "provision") {
-            if (form.deviceType === PRINTER_DEVICE_TYPE) {
-                return PRINTER_PROVISION_DEVICE_TYPES;
-            }
-
-            return CAMERA_PROVISION_DEVICE_TYPES;
-        }
-
         if (modalMode === "create") {
             return ACTIVATION_DEVICE_TYPES;
         }
 
-        return DEVICE_TYPES;
+        return ACTIVATION_DEVICE_TYPES;
     }, [form.deviceType, modalMode]);
-
-    const connectionTypes = useMemo(() => {
-        return CONNECTION_TYPES;
-    }, []);
 
     function getDeviceTypeLabel(code: string) {
         const masterLabel =
@@ -552,49 +547,11 @@ function DevicesPage() {
         setOpenModal(true);
     }
 
-    function handleOpenProvisionCamera() {
-        setMessage("");
-        setModalMode("provision");
-        setEditingId(null);
-        setActivationResult(null);
-
-        setForm({
-            ...DEFAULT_FORM,
-            deviceType: CAMERA_DEVICE_TYPE,
-            connectionType: "lan",
-            ipAddress: "",
-            status: "active",
-            isOnline: true,
-            direction: "OUT",
-            cameraRole: "lpr",
-            cameraIds: [],
-        });
-
-        setOpenModal(true);
-    }
-
-    function handleOpenProvisionPrinter() {
-        setMessage("");
-        setModalMode("provision");
-        setEditingId(null);
-        setActivationResult(null);
-
-        setForm({
-            ...DEFAULT_FORM,
-            deviceType: PRINTER_DEVICE_TYPE,
-            connectionType: "lan",
-            ipAddress: "",
-            status: "active",
-            isOnline: true,
-            printerRole: "receipt",
-            cameraIds: [],
-            printerIds: [],
-        });
-
-        setOpenModal(true);
-    }
-
     async function handleOpenEdit(device: DeviceItem) {
+        if (!isKioskType(device.deviceType) && !isBarrierGateType(device.deviceType)) {
+            return;
+        }
+
         setMessage("");
         setModalMode("edit");
         setActivationResult(null);
@@ -640,11 +597,10 @@ function DevicesPage() {
             setMessage("");
 
             const token = getToken();
-            const needsGateMapping =
-                isCameraType(form.deviceType) || isBarrierGateType(form.deviceType);
+            const needsGateMapping = isBarrierGateType(form.deviceType);
 
             if (needsGateMapping && (!form.gateId?.trim() || !form.direction)) {
-                throw new Error("Gate ID and direction are required for Camera and Barrier Gate");
+                throw new Error("Gate ID and direction are required for Barrier Gate");
             }
 
             if (isBarrierGateType(form.deviceType)) {
@@ -675,77 +631,6 @@ function DevicesPage() {
                 if (selectedPrinterIds.length === 0) {
                     throw new Error("Select at least one printer for this device");
                 }
-            }
-
-            if (modalMode === "provision") {
-                const name = form.deviceName.trim();
-                const location = form.location?.trim() ?? "";
-                const deviceCode = form.deviceCode.trim();
-                const ipAddress = form.ipAddress?.trim() ?? "";
-                const connectionType = form.connectionType.trim();
-                const isPrinterProvision = isPrinterType(form.deviceType);
-
-                if (!name || !deviceCode || !location) {
-                    throw new Error("Device name, code and location are required");
-                }
-
-                if (!isPrinterProvision && (!form.gateId?.trim() || !form.direction)) {
-                    throw new Error("Camera name, code, location, Gate ID and direction are required");
-                }
-
-                if (!connectionType || !ipAddress) {
-                    throw new Error("Camera connection type and IP address are required");
-                }
-
-                const response = await fetch(
-                    isPrinterProvision
-                        ? "/api/devices/devices/printers/provision"
-                        : "/api/devices/devices/cameras/provision",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        ...getAuthHeaders(token),
-                    },
-                    body: JSON.stringify(
-                        isPrinterProvision
-                            ? {
-                                  deviceName: name,
-                                  deviceCode,
-                                  location,
-                                  connectionType,
-                                  ipAddress,
-                                  printerRole: form.printerRole?.trim() || "receipt",
-                                  note: form.note.trim() || undefined,
-                              }
-                            : {
-                                  deviceName: name,
-                                  deviceCode,
-                                  location,
-                                  gateId: form.gateId?.trim(),
-                                  direction: form.direction,
-                                  cameraRole: form.cameraRole?.trim() || "lpr",
-                                  connectionType,
-                                  ipAddress,
-                                  note: form.note.trim() || undefined,
-                              }
-                    ),
-                    cache: "no-store",
-                });
-
-                const result = (await response.json().catch(() => null)) as
-                    | DeviceActivationResult
-                    | null;
-
-                if (!response.ok || !result) {
-                    throw new Error(
-                        getErrorMessage(result, isPrinterProvision ? "Provision Printer failed" : "Provision LPR Camera failed")
-                    );
-                }
-
-                setActivationResult(result);
-                await fetchConfig();
-                return;
             }
 
             if (
@@ -830,6 +715,10 @@ function DevicesPage() {
                 throw new Error(getErrorMessage(result, "บันทึกข้อมูลอุปกรณ์ไม่สำเร็จ"));
             }
 
+            if (modalMode === "edit" && editingId) {
+                await unmapMovedDevices(editingId);
+            }
+
             setOpenModal(false);
             setForm(DEFAULT_FORM);
             setActivationResult(null);
@@ -840,6 +729,74 @@ function DevicesPage() {
         } finally {
             setSubmitting(false);
         }
+    }
+
+    async function unmapMovedDevices(currentDeviceId: string) {
+        const selectedCameraIds = new Set((form.cameraIds ?? []).filter(Boolean));
+        const selectedPrinterIds = new Set((form.printerIds ?? []).filter(Boolean));
+        const token = getToken();
+        const updates: Promise<Response>[] = [];
+
+        devices.forEach((device) => {
+            const deviceId = device.deviceId ?? device.id ?? "";
+            if (!deviceId || deviceId === currentDeviceId) return;
+
+            if (isBarrierGateType(device.deviceType)) {
+                const currentCameraIds = device.cameraIds ?? [];
+                const currentPrinterIds = device.printerIds ?? [];
+                const nextCameraIds = currentCameraIds.filter(
+                    (cameraId) => !selectedCameraIds.has(cameraId)
+                );
+                const nextPrinterIds = currentPrinterIds.filter(
+                    (printerId) => !selectedPrinterIds.has(printerId)
+                );
+
+                if (
+                    nextCameraIds.length !== currentCameraIds.length ||
+                    nextPrinterIds.length !== currentPrinterIds.length
+                ) {
+                    updates.push(updateDeviceMapping(deviceId, {
+                        cameraIds: nextCameraIds,
+                        printerIds: nextPrinterIds,
+                    }, token));
+                }
+            }
+
+            if (isKioskType(device.deviceType)) {
+                const currentPrinterIds = device.printerIds ?? [];
+                const nextPrinterIds = currentPrinterIds.filter(
+                    (printerId) => !selectedPrinterIds.has(printerId)
+                );
+
+                if (nextPrinterIds.length !== currentPrinterIds.length) {
+                    updates.push(updateDeviceMapping(deviceId, {
+                        printerIds: nextPrinterIds,
+                    }, token));
+                }
+            }
+        });
+
+        const responses = await Promise.all(updates);
+        const failedResponse = responses.find((response) => !response.ok);
+        if (failedResponse) {
+            const result = await failedResponse.json().catch(() => null);
+            throw new Error(getErrorMessage(result, "ย้ายการผูกอุปกรณ์เดิมไม่สำเร็จ"));
+        }
+    }
+
+    function updateDeviceMapping(
+        deviceId: string,
+        body: Partial<Pick<DevicePayload, "cameraIds" | "printerIds">>,
+        token: string | null
+    ) {
+        return fetch(`/api/devices/devices/${deviceId}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                ...getAuthHeaders(token),
+            },
+            body: JSON.stringify(body),
+        });
     }
 
     async function handleDeleteDevice(id: string) {
@@ -912,24 +869,6 @@ function DevicesPage() {
                                     size={26}
                                     className={loading ? "animate-spin" : ""}
                                 />
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleOpenProvisionCamera}
-                                className="inline-flex h-12 items-center gap-3 rounded-full border border-[#061D36] bg-white px-6 text-[14px] font-bold text-[#061D36] transition hover:bg-[#F3F4F6] active:scale-[0.98]"
-                            >
-                                <LuCamera size={21} />
-                                Provision LPR Camera
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleOpenProvisionPrinter}
-                                className="inline-flex h-12 items-center gap-3 rounded-full border border-[#061D36] bg-white px-6 text-[14px] font-bold text-[#061D36] transition hover:bg-[#F3F4F6] active:scale-[0.98]"
-                            >
-                                <LuPrinter size={21} />
-                                Provision Printer
                             </button>
 
                             <button
@@ -1024,6 +963,15 @@ function DevicesPage() {
                                             const isPendingActivation =
                                                 device.status ===
                                                 "pending_activation";
+                                            const deviceIdentity = getDeviceIdentity(device);
+                                            const cameraOwner =
+                                                isCameraType(device.deviceType) && deviceIdentity
+                                                    ? cameraOwnerById.get(deviceIdentity)
+                                                    : null;
+                                            const printerOwners =
+                                                isPrinterType(device.deviceType) && deviceIdentity
+                                                    ? printerOwnersById.get(deviceIdentity) ?? []
+                                                    : [];
                                             const gateDetails = [
                                                 device.gateId ? `Gate: ${device.gateId}` : null,
                                                 device.direction ? `Direction: ${device.direction}` : null,
@@ -1041,6 +989,17 @@ function DevicesPage() {
                                                     isBarrierGateType(device.deviceType)) &&
                                                 device.printerIds?.length
                                                     ? `Printers: ${device.printerIds.join(", ")}`
+                                                    : null,
+                                                cameraOwner
+                                                    ? `Linked to: ${cameraOwner.deviceName}`
+                                                    : null,
+                                                printerOwners.length
+                                                    ? `Linked to: ${printerOwners.map((owner) => owner.deviceName).join(", ")}`
+                                                    : null,
+                                                (isCameraType(device.deviceType) || isPrinterType(device.deviceType)) &&
+                                                !cameraOwner &&
+                                                printerOwners.length === 0
+                                                    ? "Unlinked"
                                                     : null,
                                             ].filter(Boolean);
 
@@ -1089,13 +1048,15 @@ function DevicesPage() {
                                                             {getDeviceTypeLabel(device.deviceType)}
                                                         </span>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenEdit(device)}
-                                                            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#061D36] transition hover:bg-[#E5E7EB]"
-                                                        >
-                                                            <LuPencil size={18} />
-                                                        </button>
+                                                        {isKioskType(device.deviceType) || isBarrierGateType(device.deviceType) ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenEdit(device)}
+                                                                className="flex h-9 w-9 items-center justify-center rounded-lg text-[#061D36] transition hover:bg-[#E5E7EB]"
+                                                            >
+                                                                <LuPencil size={18} />
+                                                            </button>
+                                                        ) : null}
 
                                                         <button
                                                             type="button"
@@ -1142,9 +1103,10 @@ function DevicesPage() {
                 cameraDevices={cameraDevices}
                 printerDevices={printerDevices}
                 deviceTypes={modalDeviceTypes}
-                connectionTypes={connectionTypes}
                 submitting={submitting}
                 activationResult={activationResult}
+                cameraOwnerById={cameraOwnerById}
+                printerOwnersById={printerOwnersById}
                 onClose={handleCloseModal}
                 onChange={setForm}
                 onSubmit={handleSubmitDevice}

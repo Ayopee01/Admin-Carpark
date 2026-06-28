@@ -63,42 +63,6 @@ export type DeviceActivationCodeCreateResponse = {
   isOnline: boolean;
 };
 
-export type CameraProvisionRequest = {
-  deviceName: string;
-  deviceCode: string;
-  location: string;
-  gateId: string;
-  direction: DeviceDirection;
-  cameraRole: "lpr" | string;
-  connectionType: string;
-  ipAddress: string;
-  note?: string;
-};
-
-export type CameraProvisionResponse = {
-  success: boolean;
-  message: string;
-  device: DeviceItem;
-  deviceToken: string;
-};
-
-export type PrinterProvisionRequest = {
-  deviceName: string;
-  deviceCode: string;
-  location: string;
-  connectionType: string;
-  ipAddress: string;
-  printerRole: "receipt" | string;
-  note?: string;
-};
-
-export type PrinterProvisionResponse = {
-  success: boolean;
-  message: string;
-  device: DeviceItem;
-  deviceToken: string;
-};
-
 export type DevicePayload = {
   deviceCode: string;
   deviceName: string;
