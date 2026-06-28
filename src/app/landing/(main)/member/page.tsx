@@ -584,9 +584,9 @@ function MemberPage() {
 
   return (
     <>
-      <section className="min-h-screen bg-gray-100 px-6 py-8 text-gray-800 md:px-20">
+      <section className="min-h-screen bg-gray-100 px-4 py-6 text-gray-800 md:px-8 md:py-8 xl:px-20">
         <div className="mx-auto max-w-screen-7xl">
-          <div className="mb-7 flex items-start justify-between">
+          <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-green-500 bg-green-50 px-4 py-2 text-sm font-semibold text-green-600">
               <span className="h-2 w-2 rounded-full bg-green-500" />
               <span>Online</span>
@@ -597,24 +597,24 @@ function MemberPage() {
 
           <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
             <div>
-              <h1 className="text-4xl font-bold leading-8 tracking-tight text-gray-800">
+              <h1 className="text-[30px] font-bold leading-none tracking-tight text-gray-800 sm:text-4xl">
                 การตั้งค่าสมาชิก
               </h1>
 
-              <p className="mt-4 text-base text-gray-500">
+              <p className="mt-4 text-sm text-gray-500 sm:text-base">
                 จัดการข้อมูลและสิทธิ์การใช้งานของสมาชิก
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-80 items-center rounded-full border border-gray-800 bg-white px-5">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+              <div className="flex h-12 w-full items-center rounded-full border border-gray-800 bg-white px-5 sm:w-80">
                 <LuSearch size={18} className="text-gray-500" />
 
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="ค้นหา..."
-                  className="ml-3 w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
+                  className="ml-3 min-w-0 w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
                 />
               </div>
 

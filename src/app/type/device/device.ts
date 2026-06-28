@@ -7,6 +7,7 @@ export type DeviceStatus =
   | "offline"
   | "maintenance"
   | string;
+export type DeviceDirection = "IN" | "OUT" | string;
 
 export type DeviceItem = {
   id?: string;
@@ -24,6 +25,12 @@ export type DeviceItem = {
   activationExpiresAt?: ISODateString | null;
   activatedAt?: ISODateString;
   lastSeen?: ISODateString;
+  gateId?: string | null;
+  direction?: DeviceDirection | null;
+  cameraRole?: string | null;
+  cameraIds?: string[];
+  printerRole?: string | null;
+  printerIds?: string[];
 };
 
 export type DevicesConfigResponse = ConfigMeta & {
@@ -42,6 +49,10 @@ export type DeviceActivationCodeCreateRequest = {
   location?: string;
   connectionType?: string;
   note?: string;
+  gateId?: string;
+  direction?: DeviceDirection;
+  cameraIds?: string[];
+  printerIds?: string[];
 };
 
 export type DeviceActivationCodeCreateResponse = {
@@ -50,6 +61,42 @@ export type DeviceActivationCodeCreateResponse = {
   deviceType: "kiosk" | "barrier_gate";
   status: "active";
   isOnline: boolean;
+};
+
+export type CameraProvisionRequest = {
+  deviceName: string;
+  deviceCode: string;
+  location: string;
+  gateId: string;
+  direction: DeviceDirection;
+  cameraRole: "lpr" | string;
+  connectionType: string;
+  ipAddress: string;
+  note?: string;
+};
+
+export type CameraProvisionResponse = {
+  success: boolean;
+  message: string;
+  device: DeviceItem;
+  deviceToken: string;
+};
+
+export type PrinterProvisionRequest = {
+  deviceName: string;
+  deviceCode: string;
+  location: string;
+  connectionType: string;
+  ipAddress: string;
+  printerRole: "receipt" | string;
+  note?: string;
+};
+
+export type PrinterProvisionResponse = {
+  success: boolean;
+  message: string;
+  device: DeviceItem;
+  deviceToken: string;
 };
 
 export type DevicePayload = {
@@ -66,6 +113,12 @@ export type DevicePayload = {
   activationCode?: string | null;
   activationExpiresAt?: ISODateString | null;
   expiresAt?: ISODateString | null;
+  gateId?: string | null;
+  direction?: DeviceDirection | null;
+  cameraRole?: string | null;
+  cameraIds?: string[];
+  printerRole?: string | null;
+  printerIds?: string[];
 };
 
 export type DeviceMasterItem = { code: string; label: string };

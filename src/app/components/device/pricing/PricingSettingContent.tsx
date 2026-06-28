@@ -255,8 +255,8 @@ function PricingPage() {
                     ) : null}
 
                     <div className="mt-12">
-                        <div className="mb-8 flex items-center justify-between">
-                            <h2 className="border-l-[8px] border-[#061D36] pl-4 text-[32px] font-bold tracking-[-0.6px] text-[#1F2937]">
+                        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+                            <h2 className="border-l-[6px] border-[#061D36] pl-3 text-[24px] font-bold text-[#1F2937] sm:border-l-[8px] sm:pl-4 sm:text-[32px]">
                                 กำหนดราคาค่าบริการ
                             </h2>
 

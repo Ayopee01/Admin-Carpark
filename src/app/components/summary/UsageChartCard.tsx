@@ -74,7 +74,34 @@ function UsageChartCard({
                     ไม่มีข้อมูลกราฟ
                 </div>
             ) : (
-                <div className="w-full overflow-x-auto">
+                <>
+                <div className="space-y-3 md:hidden">
+                    {items.map((item) => {
+                        const percent = Math.max(4, (item.value / maxValue) * 100);
+
+                        return (
+                            <div
+                                key={item.label}
+                                className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)_44px] items-center gap-3"
+                            >
+                                <span className="truncate text-[12px] font-medium text-[#667085]">
+                                    {item.label}
+                                </span>
+                                <div className="h-7 min-w-0 rounded-full bg-[#EEF2F6]">
+                                    <div
+                                        className="h-full rounded-full bg-[#8EC0F4]"
+                                        style={{ width: `${percent}%` }}
+                                    />
+                                </div>
+                                <span className="text-right text-[12px] font-bold text-[#1F2937]">
+                                    {item.value}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="hidden w-full overflow-x-auto md:block">
                     <div className="min-w-[620px]">
                         <svg
                             viewBox={`0 0 ${width} ${height}`}
@@ -129,6 +156,7 @@ function UsageChartCard({
                         </svg>
                     </div>
                 </div>
+                </>
             )}
         </article>
     );

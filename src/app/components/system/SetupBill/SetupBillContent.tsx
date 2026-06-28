@@ -149,7 +149,7 @@ function SetupBillContent() {
 
     if (loading) {
         return (
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="grid min-w-0 max-w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="h-[520px] animate-pulse rounded-2xl bg-white" />
                 <div className="h-[420px] animate-pulse rounded-2xl bg-[#D9DDE4]" />
             </div>
@@ -157,8 +157,8 @@ function SetupBillContent() {
     }
 
     return (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-2xl border-t-4 border-[#0D1B2A] bg-white p-6 shadow-sm">
+        <div className="grid min-w-0 max-w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0 rounded-2xl border-t-4 border-[#0D1B2A] bg-white p-4 shadow-sm sm:p-6">
                 <h2 className="flex items-center gap-3 text-[22px] font-extrabold text-[#1F2933]">
                     <span className="h-6 w-1 rounded-full bg-[#1F2933]" />
                     ตั้งค่าระบบทั่วไป

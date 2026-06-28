@@ -147,7 +147,7 @@ function DevicePage() {
   }
 
   return (
-    <section className="min-h-screen bg-[#EFEFEF] px-6 py-8 text-[#1F2933] md:px-8">
+    <section className="min-h-screen bg-[#EFEFEF] px-4 py-6 text-[#1F2933] md:px-8 md:py-8">
       <div className="mx-auto max-w-[1440px]">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
@@ -161,7 +161,7 @@ function DevicePage() {
         </div>
 
         <div>
-          <h1 className="text-[42px] font-extrabold leading-none text-[#2B3640]">
+          <h1 className="text-[32px] font-extrabold leading-none text-[#2B3640] sm:text-[42px]">
             {pageTitle.title}
           </h1>
 
@@ -172,7 +172,7 @@ function DevicePage() {
 
         <SettingMenuTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        <div className="mt-8">{renderContent()}</div>
+        <div className="mt-8 min-w-0 max-w-full">{renderContent()}</div>
       </div>
     </section>
   );

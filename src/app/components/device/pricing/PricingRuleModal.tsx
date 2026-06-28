@@ -32,8 +32,8 @@ function PricingRuleModal({
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#26313C]/75 px-4 backdrop-blur-sm">
-            <div className="relative w-full max-w-[520px] rounded-[14px] bg-white p-8 shadow-2xl">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#26313C]/75 px-4 py-6 backdrop-blur-sm">
+            <div className="relative max-h-[calc(100dvh-48px)] w-full max-w-[520px] overflow-y-auto rounded-[14px] bg-white p-5 shadow-2xl sm:p-8">
                 <button
                     type="button"
                     onClick={onClose}
@@ -49,8 +49,8 @@ function PricingRuleModal({
                     กำหนดเงื่อนไขราคาแยกตามจำนวนชั่วโมง
                 </p>
 
-                <div className="mt-7 grid grid-cols-2 gap-4">
-                    <label className="col-span-2 text-[13px] font-semibold text-[#1F2937]">
+                <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <label className="text-[13px] font-semibold text-[#1F2937] sm:col-span-2">
                         เลือกประเภท
                     </label>
 
@@ -62,7 +62,7 @@ function PricingRuleModal({
                                 feeType: event.target.value as PricingRulePayload["feeType"],
                             }))
                         }
-                        className="col-span-2 h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none"
+                        className="h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none sm:col-span-2"
                     >
                         {serviceTypes.map((item) => (
                             <option key={item.code} value={item.code}>
@@ -79,7 +79,7 @@ function PricingRuleModal({
                                 vehicleType: event.target.value as PricingRulePayload["vehicleType"],
                             }))
                         }
-                        className="col-span-2 h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none"
+                        className="h-11 rounded-md border border-[#E5E7EB] px-4 text-[14px] outline-none sm:col-span-2"
                     >
                         {vehicleTypes.map((item) => (
                             <option key={item.code} value={item.code}>
@@ -124,7 +124,7 @@ function PricingRuleModal({
                         />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                         <label className="mb-2 block text-[13px] text-[#6B7280]">
                             ราคา (บาท)
                         </label>
@@ -143,7 +143,7 @@ function PricingRuleModal({
                     </div>
                 </div>
 
-                <div className="mt-9 flex justify-end gap-4">
+                <div className="mt-9 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
                     <button
                         type="button"
                         onClick={onClose}

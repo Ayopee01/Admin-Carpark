@@ -222,11 +222,11 @@ function SummaryPage() {
     }
 
     return (
-        <section className="min-h-screen bg-[#F3F4F6] px-5 py-6 text-[#1F2937] md:px-8 md:py-8">
+        <section className="min-h-screen bg-[#F3F4F6] px-4 py-6 text-[#1F2937] md:px-8 md:py-8">
             <div className="mx-auto max-w-[1320px]">
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-[36px] font-extrabold leading-none tracking-[-0.04em] text-[#1F2937]">
+                        <h1 className="text-[30px] font-extrabold leading-none text-[#1F2937] sm:text-[36px]">
                             ยอดรวมทั้งหมด
                         </h1>
                         <p className="mt-2 text-[14px] text-[#6B7280]">
@@ -278,7 +278,7 @@ function SummaryPage() {
                 </div>
 
                 <div className="mt-10">
-                    <h2 className="text-[32px] font-extrabold leading-none tracking-[-0.03em] text-[#1F2937]">
+                    <h2 className="text-[26px] font-extrabold leading-none text-[#1F2937] sm:text-[32px]">
                         ยอดรวมทั้งหมด
                     </h2>
                     <p className="mt-2 text-[14px] text-[#6B7280]">
@@ -305,7 +305,7 @@ function SummaryPage() {
                     </div>
                 </div>
 
-                <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="mt-4 grid min-w-0 max-w-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <UsageChartCard
                         title="สถิติการใช้งานของผู้ใช้"
                         description={`ข้อมูลแสดงจำนวนผู้เข้าใช้บริการ (${data.usageChartLabel ?? "รายวัน"})`}

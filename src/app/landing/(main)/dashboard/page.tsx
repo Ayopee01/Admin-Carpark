@@ -243,11 +243,11 @@ function DashboardPage() {
     }
 
     return (
-        <section className="min-h-screen bg-gray-100 px-5 py-6 text-slate-700 md:p-20">
+        <section className="min-h-screen bg-gray-100 px-4 py-6 text-slate-700 md:px-8 md:py-8 xl:p-20">
             <div className="mx-auto max-w-7xl">
-                <div className="mb-8 flex items-center justify-between">
+                <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-4xl font-bold leading-8 tracking-tight text-slate-700">
+                        <h1 className="text-[30px] font-bold leading-none tracking-tight text-slate-700 sm:text-4xl">
                             จัดการระบบ
                         </h1>
 
@@ -300,7 +300,7 @@ function DashboardPage() {
                 </div>
 
                 <div className="mt-10">
-                    <h2 className="text-3xl font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
+                    <h2 className="text-[26px] font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
                         การชำระค่าบริการ
                     </h2>
 
@@ -323,7 +323,7 @@ function DashboardPage() {
                 </div>
 
                 <div className="mt-10">
-                    <h2 className="text-3xl font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
+                    <h2 className="text-[26px] font-extrabold leading-none tracking-tight text-gray-800 md:text-4xl">
                         ยอดชำระค่าบริการแต่ละช่องทาง
                     </h2>
 

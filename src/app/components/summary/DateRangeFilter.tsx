@@ -507,7 +507,7 @@ export default function DateRangeDropdown({
                     type="button"
                     variant="outline"
                     className={cn(
-                        "h-12 min-w-[320px] justify-between rounded-full border border-[#BFC5CC] bg-[#F3F4F6] px-5 text-[15px] font-medium text-[#1F2933] shadow-none hover:bg-white",
+                        "h-12 w-full min-w-0 justify-between rounded-full border border-[#BFC5CC] bg-[#F3F4F6] px-5 text-[15px] font-medium text-[#1F2933] shadow-none hover:bg-white sm:min-w-[320px]",
                         !currentLabelRange?.from && "text-[#6B7280]"
                     )}
                 >

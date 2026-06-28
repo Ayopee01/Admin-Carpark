@@ -27,7 +27,7 @@ const menuItems: {
 
 function SystemMenuTabs({ activeTab, onChange }: SystemMenuTabsProps) {
     return (
-        <div className="mt-6 flex flex-wrap gap-2 rounded-xl bg-[#E3E5E8] p-2 md:inline-flex">
+        <div className="mt-6 flex w-full flex-col gap-2 rounded-xl bg-[#E3E5E8] p-2 md:inline-flex md:w-auto md:flex-row">
             {menuItems.map((item) => {
                 const isActive = item.key === activeTab;
 
@@ -36,7 +36,7 @@ function SystemMenuTabs({ activeTab, onChange }: SystemMenuTabsProps) {
                         key={item.key}
                         type="button"
                         onClick={() => onChange(item.key)}
-                        className={`rounded-lg px-4 py-3 text-[13px] font-semibold transition ${isActive
+                        className={`w-full rounded-lg px-4 py-3 text-left text-[13px] font-semibold transition md:w-auto md:text-center ${isActive
                             ? "bg-white text-[#1F2933] shadow-sm"
                             : "text-[#1F2933] hover:bg-white/70"
                             }`}

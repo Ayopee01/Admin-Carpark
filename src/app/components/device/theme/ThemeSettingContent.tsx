@@ -651,7 +651,7 @@ function ThemeSettingContent() {
                     การตั้งค่าธีม
                 </h2>
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="grid min-w-0 max-w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
                     <div className="min-h-[360px] animate-pulse rounded-2xl bg-[#E4E6E8]" />
                     <div className="min-h-[360px] animate-pulse rounded-[24px] bg-[#E4E6E8]" />
                 </div>
@@ -686,8 +686,8 @@ function ThemeSettingContent() {
                 </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-                <div className="rounded-2xl bg-[#F8F8F8] p-6">
+            <div className="grid min-w-0 max-w-full grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="min-w-0 rounded-2xl bg-[#F8F8F8] p-4 sm:p-6">
                     <div className="text-[18px] font-extrabold text-[#2B3640]">
                         ธีมที่มีอยู่
                     </div>

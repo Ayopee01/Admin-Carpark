@@ -787,6 +787,8 @@ export type ChannelMappingUpdateRequest = {
 
 - `GET /api/v1/devices`
 - `POST /api/v1/devices`
+- `POST /api/v1/devices/cameras/provision`
+- `POST /api/v1/devices/printers/provision`
 - `PUT /api/v1/devices/:deviceId`
 - `DELETE /api/v1/devices/:deviceId`
 - `GET /api/v1/devices/events`
@@ -811,6 +813,8 @@ export type DeviceStatus =
   | "maintenance"
   | string;
 
+export type DeviceDirection = "IN" | "OUT" | string;
+
 export type Device = {
   id?: string;
   deviceId: string | null;
@@ -827,6 +831,12 @@ export type Device = {
   activationExpiresAt?: ISODateString | null;
   activatedAt?: ISODateString;
   lastSeen?: ISODateString;
+  gateId?: string | null;
+  direction?: DeviceDirection | null;
+  cameraRole?: string | null;
+  cameraIds?: string[];
+  printerRole?: string | null;
+  printerIds?: string[];
 };
 
 export type DeviceListResponse = ConfigMeta & {
@@ -845,6 +855,10 @@ export type DeviceActivationCodeCreateRequest = {
   location?: string;
   connectionType?: string;
   note?: string;
+  gateId?: string;
+  direction?: DeviceDirection;
+  cameraIds?: string[];
+  printerIds?: string[];
 };
 
 export type DeviceActivationCodeCreateResponse = {
@@ -853,6 +867,42 @@ export type DeviceActivationCodeCreateResponse = {
   deviceType: "kiosk" | "barrier_gate";
   status: "active";
   isOnline: boolean;
+};
+
+export type CameraProvisionRequest = {
+  deviceName: string;
+  deviceCode: string;
+  location: string;
+  gateId: string;
+  direction: DeviceDirection;
+  cameraRole: "lpr" | string;
+  connectionType: string;
+  ipAddress: string;
+  note?: string;
+};
+
+export type CameraProvisionResponse = {
+  success: boolean;
+  message: string;
+  device: Device;
+  deviceToken: string;
+};
+
+export type PrinterProvisionRequest = {
+  deviceName: string;
+  deviceCode: string;
+  location: string;
+  connectionType: string;
+  ipAddress: string;
+  printerRole: "receipt" | string;
+  note?: string;
+};
+
+export type PrinterProvisionResponse = {
+  success: boolean;
+  message: string;
+  device: Device;
+  deviceToken: string;
 };
 
 export type DeviceUpdateRequest = Partial<{
@@ -867,6 +917,12 @@ export type DeviceUpdateRequest = Partial<{
   status: DeviceStatus;
   isOnline: boolean;
   note: string;
+  gateId: string | null;
+  direction: DeviceDirection | null;
+  cameraRole: string | null;
+  cameraIds: string[];
+  printerRole: string | null;
+  printerIds: string[];
 }>;
 
 export type DeviceMutationResponse = {
@@ -942,6 +998,13 @@ export type DeviceSseEvent =
   - `keyword`
 - หน้าเพิ่มอุปกรณ์จริงคือสร้าง activation code ผ่าน `POST /api/v1/devices`
 - Response ใช้ `CodeActivate` สำหรับแสดงรหัสให้ Kiosk/Barrier Gate นำไป activate
+- `POST /api/v1/devices` รองรับ activation code เฉพาะ `deviceType` เป็น `kiosk` หรือ `barrier_gate` เท่านั้น ห้ามส่ง `deviceType: "camera"` เข้า endpoint นี้
+- Provision กล้อง LPR ใช้ `POST /api/v1/devices/cameras/provision` โดยส่ง `deviceName`, `deviceCode`, `location`, `gateId`, `direction`, `cameraRole`, `connectionType`, `ipAddress`, และ `note`
+- Provision Printer ใช้ `POST /api/v1/devices/printers/provision` โดยส่ง `deviceName`, `deviceCode`, `location`, `connectionType`, `ipAddress`, `printerRole`, และ `note`
+- Response ของ camera/printer provision มี `deviceToken` ซึ่ง backend แสดงครั้งเดียว Frontend ต้องแสดงให้ copy ทันทีและไม่คาดหวังว่าจะดึงซ้ำได้
+- Barrier Gate setup ต้องส่ง `gateId`, `direction`, `cameraIds`, และ `printerIds` โดยเลือกจาก camera/printer devices ที่ provision แล้ว
+- Kiosk setup ต้องส่ง `printerIds` โดยเลือกจาก printer devices ที่ provision แล้ว และไม่ต้องเลือก `cameraIds`
+- หน้า Barrier Gate form ควร filter กล้องตาม `direction` ของ gate หรือแจ้งเตือนเมื่อ direction ไม่ตรง
 - หลัง create/update/delete ให้ refetch list
 - เปิด SSE `/api/v1/devices/events` เพื่อ update status realtime
 

@@ -352,11 +352,11 @@ function CheckPaymentPage() {
 
   return (
     <>
-      <section className="min-h-screen bg-[#EFEFEF] px-6 py-8 text-[#1F2933] md:px-8">
+      <section className="min-h-screen bg-[#EFEFEF] px-4 py-6 text-[#1F2933] md:px-8 md:py-8">
         <div className="mx-auto max-w-[1400px]">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-[34px] font-extrabold leading-none text-[#2B3640]">
+              <h1 className="text-[28px] font-extrabold leading-none text-[#2B3640] sm:text-[34px]">
                 ตรวจสอบและชำระเงิน
               </h1>
               <p className="mt-3 text-[15px] text-[#67727E]">• แอดมินบริการ</p>
@@ -368,25 +368,25 @@ function CheckPaymentPage() {
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-[#D8DADF] bg-[#F2F2F2] p-6 shadow-sm">
-            <div className="text-center text-[20px] font-extrabold text-[#111827]">
+          <div className="rounded-[20px] border border-[#D8DADF] bg-[#F2F2F2] p-4 shadow-sm sm:p-6">
+            <div className="text-center text-[18px] font-extrabold text-[#111827] sm:text-[20px]">
               ค้นหาด้วยเลขทะเบียน
             </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="relative flex h-12 items-center rounded-full border border-gray-300 bg-[#F4F4F4] px-6">
+            <div className="mt-5 grid min-w-0 max-w-full gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="relative flex h-12 items-center rounded-full border border-gray-300 bg-[#F4F4F4] px-4 sm:px-6">
                 <LuCarFront size={22} className="shrink-0 text-[#8D99A8]" />
 
                 <input
                   value={searchPlate}
                   onChange={(event) => setSearchPlate(event.target.value)}
                   placeholder="กรอกเลขทะเบียน"
-                  className="ml-4 w-full bg-transparent pr-10 text-[16px] text-[#1F2933] outline-none placeholder:text-[#9AA3AF]"
+                  className="ml-3 min-w-0 w-full bg-transparent pr-9 text-[16px] text-[#1F2933] outline-none placeholder:text-[#9AA3AF] sm:ml-4 sm:pr-10"
                 />
 
                 <LuSearch
                   size={20}
-                  className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 text-[#8D99A8]"
+                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[#8D99A8] sm:right-6"
                 />
               </div>
 

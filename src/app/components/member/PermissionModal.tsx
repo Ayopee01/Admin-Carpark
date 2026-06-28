@@ -31,8 +31,8 @@ function PermissionModal({
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#111827]/80 px-4 backdrop-blur-sm">
-            <div className="relative w-full max-w-[460px] overflow-hidden rounded-[14px] bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#111827]/80 px-4 py-6 backdrop-blur-sm">
+            <div className="relative max-h-[calc(100dvh-48px)] w-full max-w-[460px] overflow-y-auto rounded-[14px] bg-white shadow-2xl">
                 <div className="bg-[#E9EAEC] px-7 py-5">
                     <button
                         type="button"
@@ -49,7 +49,7 @@ function PermissionModal({
                     <p className="text-[13px] text-[#6B7280]">การอนุญาตสิทธิ์</p>
                 </div>
 
-                <div className="px-8 py-7">
+                <div className="px-5 py-6 sm:px-8 sm:py-7">
                     <div className="space-y-5">
                         {permissions.map((permission) => (
                             <label
@@ -72,7 +72,7 @@ function PermissionModal({
                         ))}
                     </div>
 
-                    <div className="mt-9 flex justify-end gap-4">
+                    <div className="mt-9 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-4">
                         <button
                             type="button"
                             onClick={onClose}

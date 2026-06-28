@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { LuMenu } from "react-icons/lu";
 import Sidebar from "@/src/app/components/Sidebar";
 import ForbiddenState from "@/src/app/components/ForbiddenState";
 import { apiRequest, ForbiddenError } from "@/src/app/lib/api/apiClient";
@@ -24,6 +25,7 @@ function MainLayout({ children }: { children: ReactNode }) {
     const [ready, setReady] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [forbiddenPermission, setForbiddenPermission] = useState<Permission>();
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -90,9 +92,26 @@ function MainLayout({ children }: { children: ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">{children}</main>
+        <div className="flex h-dvh overflow-hidden bg-[#EFEFEF]">
+            <Sidebar
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={() => setMobileSidebarOpen(false)}
+            />
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
+                    <button
+                        type="button"
+                        onClick={() => setMobileSidebarOpen(true)}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-900"
+                        aria-label="Open navigation"
+                    >
+                        <LuMenu className="h-5 w-5" />
+                    </button>
+                    <div className="text-sm font-extrabold text-slate-900">Smart Carpark</div>
+                    <div className="h-10 w-10" aria-hidden="true" />
+                </header>
+                <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+            </main>
         </div>
     );
 }

@@ -13,18 +13,17 @@ import type {
   ServiceChannelsResponse,
 } from "@/src/app/type/device/payment";
 
-type PaymentStatus = "paid" | "unpaid";
-
-type RawPaymentStatus = PaymentStatus | "pending" | "completed" | "cancelled";
-
 type TransactionDetailResponse = {
   id: string;
   billNo: string;
   plateNo: string;
-  durationHour: number;
+  durationDisplay: string;
+  baseAmount: number;
   netAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  discountAmount: number;
   payment: {
-    status: PaymentStatus;
     method: string | null;
     qrCodeText: string | null;
     qrCodeImageUrl: string | null;
@@ -46,27 +45,197 @@ type Props = {
   onSuccess: () => Promise<void> | void;
 };
 
-function normalizePaymentStatus(status?: RawPaymentStatus | null): PaymentStatus {
-  if (status === "paid" || status === "completed") return "paid";
-  return "unpaid";
+function formatCurrency(value: number) {
+  return value.toFixed(2);
 }
 
-function formatDurationHour(hours: number) {
-  return `${hours} ชั่วโมง`;
+function resolvePaymentMode(value?: string | null): PaymentMode | null {
+  const normalized = value?.trim().toLowerCase();
+
+  if (!normalized) return null;
+  if (normalized === "cash" || normalized.includes("เงินสด")) return "cash";
+  if (normalized === "qr" || normalized.includes("qr") || normalized.includes("คิวอาร์")) return "qr";
+
+  return null;
+}
+
+function getMethodMode(method: { id: string; label: string; icon?: string; method?: string; action?: string }) {
+  return (
+    resolvePaymentMode(method.method) ??
+    resolvePaymentMode(method.action) ??
+    resolvePaymentMode(method.icon) ??
+    resolvePaymentMode(method.id) ??
+    resolvePaymentMode(method.label)
+  );
+}
+
+function getAvailablePaymentModes(
+  methods: PaymentMethodsResponse | null,
+  channels: ServiceChannelsResponse | null
+) {
+  const activeMethods = methods?.data?.filter((method) => method.isActive) ?? [];
+  const activeMethodModes = new Set<PaymentMode>();
+  const activeMethodKeys = new Map<string, PaymentMode>();
+
+  if ((methods?.data?.length ?? 0) === 0) {
+    return ["qr", "cash"] satisfies PaymentMode[];
+  }
+
+  activeMethods.forEach((method) => {
+    const mode = getMethodMode(method);
+
+    if (!mode) return;
+
+    activeMethodModes.add(mode);
+    [method.id, method.method, method.action, method.icon, method.label].forEach((key) => {
+      if (key) activeMethodKeys.set(key.toLowerCase(), mode);
+    });
+  });
+
+  const cashierChannel = (channels?.data ?? []).find(
+    (item) => item.id === "cashier" || item.name.toLowerCase().includes("cashier")
+  );
+
+  if (!cashierChannel) {
+    return Array.from(activeMethodModes);
+  }
+
+  const allowedModes = new Set<PaymentMode>();
+
+  cashierChannel.allowedMethods.forEach((methodKey) => {
+    const mode =
+      resolvePaymentMode(methodKey) ??
+      activeMethodKeys.get(methodKey.toLowerCase()) ??
+      null;
+
+    if (mode && activeMethodModes.has(mode)) {
+      allowedModes.add(mode);
+    }
+  });
+
+  return allowedModes.size > 0
+    ? Array.from(allowedModes)
+    : Array.from(activeMethodModes);
+}
+
+function sumPaidAmount(raw: RawTransactionDetailResponse) {
+  return raw.payments.reduce((sum, payment) => {
+    return sum + (payment.paidAmount ?? payment.amount ?? 0);
+  }, 0);
+}
+
+function addUnit(date: Date, unit: "year" | "month" | "day" | "hour" | "minute") {
+  const next = new Date(date);
+
+  if (unit === "year") next.setFullYear(next.getFullYear() + 1);
+  if (unit === "month") next.setMonth(next.getMonth() + 1);
+  if (unit === "day") next.setDate(next.getDate() + 1);
+  if (unit === "hour") next.setHours(next.getHours() + 1);
+  if (unit === "minute") next.setMinutes(next.getMinutes() + 1);
+
+  return next;
+}
+
+function countCalendarUnit(
+  cursor: Date,
+  end: Date,
+  unit: "year" | "month" | "day" | "hour" | "minute"
+) {
+  let count = 0;
+  let next = addUnit(cursor, unit);
+
+  while (next <= end) {
+    count += 1;
+    cursor = next;
+    next = addUnit(cursor, unit);
+  }
+
+  return { count, cursor };
+}
+
+function formatDurationFromMinutes(totalMinutes: number) {
+  let remaining = Math.max(0, Math.floor(totalMinutes));
+  const years = Math.floor(remaining / (365 * 24 * 60));
+  remaining -= years * 365 * 24 * 60;
+  const months = Math.floor(remaining / (30 * 24 * 60));
+  remaining -= months * 30 * 24 * 60;
+  const days = Math.floor(remaining / (24 * 60));
+  remaining -= days * 24 * 60;
+  const hours = Math.floor(remaining / 60);
+  const minutes = remaining % 60;
+
+  return formatDurationParts({ years, months, days, hours, minutes });
+}
+
+function formatDurationParts(parts: {
+  years: number;
+  months: number;
+  days: number;
+  hours: number;
+  minutes: number;
+}) {
+  const labels = [
+    parts.years ? `${parts.years} ปี` : "",
+    parts.months ? `${parts.months} เดือน` : "",
+    parts.days ? `${parts.days} วัน` : "",
+    parts.hours ? `${parts.hours} ชั่วโมง` : "",
+    parts.minutes ? `${parts.minutes} นาที` : "",
+  ].filter(Boolean);
+
+  return labels.length > 0 ? labels.join(" ") : "0 นาที";
+}
+
+function formatParkingDuration(raw: RawTransactionDetailResponse) {
+  const start = raw.entryAt ? new Date(raw.entryAt) : null;
+  const endSource = raw.exitAt ?? raw.calculatedAt;
+  const end = endSource ? new Date(endSource) : new Date();
+
+  if (
+    !start ||
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end < start
+  ) {
+    return formatDurationFromMinutes(raw.totalMinutes);
+  }
+
+  let cursor = new Date(start);
+  const yearsResult = countCalendarUnit(cursor, end, "year");
+  cursor = yearsResult.cursor;
+  const monthsResult = countCalendarUnit(cursor, end, "month");
+  cursor = monthsResult.cursor;
+  const daysResult = countCalendarUnit(cursor, end, "day");
+  cursor = daysResult.cursor;
+  const hoursResult = countCalendarUnit(cursor, end, "hour");
+  cursor = hoursResult.cursor;
+  const minutesResult = countCalendarUnit(cursor, end, "minute");
+
+  return formatDurationParts({
+    years: yearsResult.count,
+    months: monthsResult.count,
+    days: daysResult.count,
+    hours: hoursResult.count,
+    minutes: minutesResult.count,
+  });
 }
 
 function normalizeDetail(raw: RawTransactionDetailResponse): TransactionDetailResponse {
   const latestPayment = raw.payments.at(-1);
+  const paidAmount = raw.totalPaid ?? sumPaidAmount(raw);
+  const discountAmount = Math.max(raw.baseAmount - raw.netAmount, 0);
 
   return {
     id: raw.id,
     billNo: raw.billNo,
     plateNo: raw.plateNo,
-    durationHour: raw.durationHour,
-    netAmount: raw.remainingAmount,
+    durationDisplay: formatParkingDuration(raw),
+    baseAmount: raw.baseAmount,
+    netAmount: raw.netAmount,
+    paidAmount,
+    remainingAmount: raw.remainingAmount,
+    discountAmount,
 
     payment: {
-      status: normalizePaymentStatus(raw.status as RawPaymentStatus),
       method: latestPayment?.method ?? null,
       qrCodeText: raw.qrData || null,
       qrCodeImageUrl: null,
@@ -84,10 +253,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<PaymentMode>("qr");
   const [printReceipt, setPrintReceipt] = useState(true);
-
-  // ให้เริ่มต้นเป็น 0 เสมอ ไม่อิง netAmount
   const [cashReceived, setCashReceived] = useState("0");
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [availableMethods, setAvailableMethods] = useState<PaymentMode[]>([]);
@@ -102,8 +268,6 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         setLoading(true);
         setError("");
         setDetail(null);
-
-        // reset ทุกครั้งที่เปิดรายการใหม่ กันค่าเก่าค้าง
         setCashReceived("0");
 
         const token = localStorage.getItem("token");
@@ -141,16 +305,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
         const [methodsResponse, channelsResponse] = await settingsPromise;
         const methodsJson = (await methodsResponse.json().catch(() => null)) as PaymentMethodsResponse | null;
         const channelsJson = (await channelsResponse.json().catch(() => null)) as ServiceChannelsResponse | null;
-        const activeMethodIds = new Set(
-          (methodsJson?.data ?? []).filter((item) => item.isActive).map((item) => item.id)
-        );
-        const cashierChannel = (channelsJson?.data ?? []).find(
-          (item) => item.id === "cashier" || item.name.toLowerCase().includes("cashier")
-        );
-        const allowed = (cashierChannel?.allowedMethods ?? []).filter(
-          (method): method is PaymentMode =>
-            (method === "cash" || method === "qr") && activeMethodIds.has(method)
-        );
+        const allowed = getAvailablePaymentModes(methodsJson, channelsJson);
 
         if (!ignore) {
           setDetail(normalized);
@@ -160,8 +315,6 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
               ? normalized.payment.method === "cash" ? "cash" : "qr"
               : allowed[0] ?? "qr"
           );
-
-          // ไม่อิง netAmount แล้ว ให้ admin กรอกเองทุกครั้ง
           setCashReceived("0");
         }
       } catch (err) {
@@ -186,7 +339,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
 
   const changeAmount = useMemo(() => {
     if (!detail) return 0;
-    return receivedAmount > detail.netAmount ? receivedAmount - detail.netAmount : 0;
+    return receivedAmount > detail.remainingAmount ? receivedAmount - detail.remainingAmount : 0;
   }, [receivedAmount, detail]);
 
   async function handleConfirmPayment() {
@@ -202,14 +355,14 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
 
       const token = localStorage.getItem("token");
 
-      if (mode === "cash" && receivedAmount < detail.netAmount) {
+      if (mode === "cash" && receivedAmount < detail.remainingAmount) {
         throw new Error("จำนวนเงินรับน้อยกว่ายอดชำระ");
       }
 
       const payload: PaymentRequest = {
         method: mode,
         channel: "cashier",
-        amount: detail.netAmount,
+        amount: detail.remainingAmount,
       };
 
       const response = await fetch(
@@ -249,7 +402,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-[1100px] rounded-[32px] bg-white p-5 shadow-2xl md:p-8"
+        className="relative max-h-[calc(100dvh-48px)] w-full max-w-[1100px] overflow-y-auto rounded-[24px] bg-white p-4 shadow-2xl sm:rounded-[32px] md:p-8"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -269,8 +422,8 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
           <div className="py-20 text-center text-red-600">{error}</div>
         ) : detail ? (
           <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="rounded-[20px] bg-[#F5F6F7] p-6">
-              <h2 className="text-[34px] font-extrabold leading-none text-[#101C2B]">
+            <div className="rounded-[20px] bg-[#F5F6F7] p-5 md:p-6">
+              <h2 className="text-[26px] font-extrabold leading-none text-[#101C2B] sm:text-[34px]">
                 ทำรายการชำระเงิน
               </h2>
 
@@ -286,18 +439,45 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#E3E7EB] pb-3">
+                <div className="flex items-center justify-between gap-4 border-b border-[#E3E7EB] pb-3">
                   <span className="text-[14px] text-[#8A95A3]">เวลาที่จอด</span>
-                  <span className="text-[18px] font-bold text-[#1F2933]">
-                    {formatDurationHour(detail.durationHour)}
+                  <span className="text-right text-[18px] font-bold text-[#1F2933]">
+                    {detail.durationDisplay}
                   </span>
                 </div>
 
+                <div className="space-y-2 border-b border-[#E3E7EB] pb-4 text-[14px]">
+                  <div className="flex items-center justify-between text-[#66707D]">
+                    <span>ยอดรวม</span>
+                    <span className="font-semibold text-[#1F2933]">
+                      {formatCurrency(detail.netAmount)} ฿
+                    </span>
+                  </div>
+
+                  {detail.discountAmount > 0 ? (
+                    <div className="flex items-center justify-between text-[#34B44C]">
+                      <span>ส่วนลด</span>
+                      <span className="font-semibold">
+                        -{formatCurrency(detail.discountAmount)} ฿
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {detail.paidAmount > 0 ? (
+                    <div className="flex items-center justify-between text-[#66707D]">
+                      <span>ชำระแล้ว</span>
+                      <span className="font-semibold text-[#1F2933]">
+                        {formatCurrency(detail.paidAmount)} ฿
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
                 <div className="pt-3">
-                  <div className="text-[14px] text-[#8A95A3]">ยอดรวมทั้งหมด</div>
+                  <div className="text-[14px] text-[#8A95A3]">ยอดที่ต้องชำระ</div>
                   <div className="mt-2 flex items-end gap-2">
-                    <span className="text-[54px] font-extrabold leading-none text-[#101C2B]">
-                      {detail.netAmount.toFixed(2)}
+                    <span className="text-[40px] font-extrabold leading-none text-[#101C2B] sm:text-[54px]">
+                      {formatCurrency(detail.remainingAmount)}
                     </span>
                     <span className="pb-2 text-[22px] font-bold text-[#101C2B]">
                       ฿
@@ -356,7 +536,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
 
               {mode === "qr" ? (
                 <div className="mt-4 rounded-[22px] bg-[#EEF3F9] px-6 py-8 text-center">
-                  <div className="mx-auto flex min-h-[300px] max-w-[520px] items-center justify-center">
+                  <div className="mx-auto flex min-h-[220px] max-w-[520px] items-center justify-center sm:min-h-[300px]">
                     {detail.payment?.qrCodeImageUrl ? (
                       <div>
                         <Image
@@ -364,7 +544,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                           alt="QR Code"
                           width={220}
                           height={220}
-                          className="mx-auto h-[220px] w-[220px]"
+                          className="mx-auto h-[180px] w-[180px] sm:h-[220px] sm:w-[220px]"
                           unoptimized
                         />
                         <p className="mt-6 text-[16px] text-[#374151]">
@@ -390,7 +570,7 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                       min={0}
                       value={cashReceived}
                       onChange={(event) => setCashReceived(event.target.value)}
-                      className="w-full bg-transparent text-right text-[40px] font-extrabold text-[#1F2933] outline-none"
+                      className="w-full bg-transparent text-right text-[30px] font-extrabold text-[#1F2933] outline-none sm:text-[40px]"
                     />
                     <span className="ml-3 text-[22px] font-bold text-[#94A3B8]">
                       ฿
@@ -402,8 +582,8 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
                       จำนวนเงินที่ต้องทอน
                     </div>
                     <div className="mt-4 flex items-end justify-end gap-2">
-                      <span className="text-[48px] font-extrabold leading-none text-[#101C2B]">
-                        {changeAmount.toFixed(2)}
+                      <span className="text-[34px] font-extrabold leading-none text-[#101C2B] sm:text-[48px]">
+                        {formatCurrency(changeAmount)}
                       </span>
                       <span className="pb-2 text-[22px] font-bold text-[#101C2B]">
                         ฿
@@ -420,8 +600,8 @@ function PaymentModal({ open, transactionId, onClose, onSuccess }: Props) {
               <button
                 type="button"
                 onClick={handleConfirmPayment}
-                disabled={submitting}
-                className="mt-6 inline-flex min-h-[72px] w-full items-center justify-center rounded-[18px] bg-[#061D36] px-6 text-[22px] font-bold text-white shadow-[0_12px_30px_rgba(6,29,54,0.18)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={submitting || detail.remainingAmount <= 0}
+                className="mt-6 inline-flex min-h-[60px] w-full items-center justify-center rounded-[18px] bg-[#061D36] px-5 text-[17px] font-bold text-white shadow-[0_12px_30px_rgba(6,29,54,0.18)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[72px] sm:text-[22px]"
               >
                 {submitting ? "กำลังบันทึก..." : "ยืนยันการชำระเงิน"}
               </button>

@@ -82,7 +82,12 @@ function hasAnyPermission(
 }
 
 /* -------------------- Component -------------------- */
-function Sidebar() {
+type SidebarProps = {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+};
+
+function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [user, setUser] = useState<SidebarUser | null>(() => getStoredUser());
   const [openLogoutPopup, setOpenLogoutPopup] = useState(false);
@@ -166,14 +171,23 @@ function Sidebar() {
 
   return (
     <>
-      <nav className={`relative flex h-screen flex-col bg-slate-900 text-white transition-[width] duration-300 ease-in-out 
-      ${collapsed ? "w-24" : "w-64"}`}
+      {mobileOpen ? (
+        <button
+          type="button"
+          aria-label="Close navigation overlay"
+          className="fixed inset-0 z-40 bg-black/45 lg:hidden"
+          onClick={onMobileClose}
+        />
+      ) : null}
+
+      <nav className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[86vw] flex-col bg-slate-900 text-white transition-[transform,width] duration-300 ease-in-out lg:relative lg:z-auto lg:h-screen lg:max-w-none lg:translate-x-0
+      ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-24" : "lg:w-64"}`}
       >
         {/* Collapsed */}
         <button
           type="button"
           onClick={() => setCollapsed((prev) => !prev)}
-          className="absolute -right-6 top-10 z-20 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-900 shadow-md"
+          className="absolute -right-6 top-10 z-20 hidden h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white text-slate-900 shadow-md lg:flex"
           aria-label={collapsed ? "ขยาย sidebar" : "ย่อ sidebar"}
         >
           <LuChevronLeft
@@ -191,7 +205,7 @@ function Sidebar() {
 
             <div
               className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-in-out ${collapsed
-                ? "max-w-0 -translate-x-2 opacity-0"
+                ? "max-w-full translate-x-0 opacity-100 lg:max-w-0 lg:-translate-x-2 lg:opacity-0"
                 : "max-w-full translate-x-0 opacity-100"
                 }`}
             >
@@ -215,10 +229,11 @@ function Sidebar() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
+                    onClick={onMobileClose}
                     className={`flex items-center rounded-lg px-4 py-4 text-sm transition-colors duration-200 ${isActive
                       ? "bg-white text-slate-900"
                       : "text-white hover:bg-white/10"
-                      } ${collapsed ? "justify-center" : "justify-start"}`}
+                      } ${collapsed ? "justify-start lg:justify-center" : "justify-start"}`}
                   >
                     <div className="text-2xl flex shrink-0 items-center justify-center">
                       <Icon />
@@ -226,7 +241,7 @@ function Sidebar() {
 
                     <span
                       className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                        ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                        ? "ml-3 max-w-full translate-x-0 opacity-100 lg:ml-0 lg:max-w-0 lg:-translate-x-2 lg:opacity-0"
                         : "ml-3 max-w-full translate-x-0 opacity-100"
                         }`}
                     >
@@ -240,7 +255,7 @@ function Sidebar() {
 
           <div className="mt-auto">
             <div
-              className={`p-4 flex items-center ${collapsed ? "justify-center" : "justify-start"
+              className={`p-4 flex items-center ${collapsed ? "justify-start lg:justify-center" : "justify-start"
                 }`}
             >
               <div className="text-2xl">
@@ -248,7 +263,7 @@ function Sidebar() {
               </div>
 
               <div className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                ? "ml-3 max-w-full translate-x-0 opacity-100 lg:ml-0 lg:max-w-0 lg:-translate-x-2 lg:opacity-0"
                 : "ml-3 max-w-full translate-x-0 opacity-100"
                 }`}
               >
@@ -264,7 +279,7 @@ function Sidebar() {
             <button
               type="button"
               onClick={() => setOpenLogoutPopup(true)}
-              className={`cursor-pointer flex w-full items-center rounded-2xl p-4 text-sm text-white transition-colors duration-200 hover:bg-white/10 ${collapsed ? "justify-center" : "justify-start"
+              className={`cursor-pointer flex w-full items-center rounded-2xl p-4 text-sm text-white transition-colors duration-200 hover:bg-white/10 ${collapsed ? "justify-start lg:justify-center" : "justify-start"
                 }`}
             >
               <div className="text-xl flex shrink-0 items-center justify-center">
@@ -273,7 +288,7 @@ function Sidebar() {
 
               <span
                 className={`overflow-hidden whitespace-nowrap transition-[max-width,opacity,margin,transform] duration-300 ease-in-out ${collapsed
-                  ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                  ? "ml-3 max-w-full translate-x-0 opacity-100 lg:ml-0 lg:max-w-0 lg:-translate-x-2 lg:opacity-0"
                   : "ml-3 max-w-full translate-x-0 opacity-100"
                   }`}
               >
@@ -292,11 +307,11 @@ function Sidebar() {
 
       {openLogoutPopup ? (
         <div
-          className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-4 backdrop-blur-xs"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-xs"
           onClick={closeLogoutConfirm}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="max-h-[calc(100dvh-48px)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between border-b border-slate-800/15 px-6 py-5 bg-slate-900/10">
@@ -318,7 +333,7 @@ function Sidebar() {
             </div>
 
             <div className="px-6 py-6">
-              <div className="mx-auto flex h-60 w-80 flex-col items-center justify-center rounded-lg bg-slate-100 p-8 text-center">
+              <div className="mx-auto flex h-60 w-full max-w-80 flex-col items-center justify-center rounded-lg bg-slate-100 p-8 text-center">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-900 shadow-sm">
                   <LuUsers className="h-7 w-7" />
                 </div>
