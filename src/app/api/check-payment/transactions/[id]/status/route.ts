@@ -29,7 +29,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         const authorization = req.headers.get("authorization");
         const body = await req.json().catch(() => null);
 
-        const response = await fetch(`${baseUrl}/api/v1/transactions/${id}/status`, {
+        const encodedId = encodeURIComponent(id);
+
+        const response = await fetch(`${baseUrl}/api/v1/transactions/${encodedId}/status`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",

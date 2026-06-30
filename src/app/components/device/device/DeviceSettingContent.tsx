@@ -15,6 +15,7 @@ import DeviceModal from "@/src/app/components/device/device/DeviceModal";
 import type {
     DeviceItem,
     DeviceActivationCodeCreateResponse,
+    DeviceActivationCodeReissueResponse,
     DeviceMasterItem,
     DevicePayload,
     DevicesConfigResponse,
@@ -58,18 +59,26 @@ type DeviceActivationResult = Partial<DeviceActivationCodeCreateResponse> & {
     message?: string;
     deviceId?: string | null;
     success?: boolean;
+    activationCode?: string;
+    code?: string;
+    expiresAt?: string | null;
+    recovery?: boolean;
+    device?: DeviceActivationCodeReissueResponse["device"];
 };
 
 type DeviceEventPayload = {
     type?: string;
     id?: string;
     deviceId?: string | null;
+    deviceCode?: string | null;
     activationCode?: string | null;
     code?: string | null;
     deviceName?: string | null;
     deviceType?: string;
     status?: string;
     isOnline?: boolean;
+    lastSeen?: string;
+    device?: Partial<DeviceItem>;
 };
 
 function getToken() {
@@ -138,9 +147,8 @@ function getDeviceIcon(type: string) {
     return <LuPrinter className="text-[20px]" />;
 }
 
-function toDevicePayload(form: DevicePayload): DevicePayload {
-    const payload: DevicePayload = {
-        deviceCode: form.deviceCode,
+function toDevicePayload(form: DevicePayload): Partial<DevicePayload> {
+    const payload: Partial<DevicePayload> = {
         deviceName: form.deviceName,
         deviceType: form.deviceType,
         connectionType: form.connectionType,
@@ -149,6 +157,10 @@ function toDevicePayload(form: DevicePayload): DevicePayload {
         isOnline: form.isOnline,
         note: form.note,
     };
+
+    if (form.deviceCode.trim()) {
+        payload.deviceCode = form.deviceCode.trim();
+    }
 
     if (isActivationDeviceType(form.deviceType)) {
         payload.location = form.location?.trim() || null;
@@ -171,8 +183,53 @@ function getDeviceIdentity(device: DeviceItem) {
     return device.deviceId ?? device.deviceCode ?? device.id ?? "";
 }
 
+function matchesDeviceEvent(device: DeviceItem, event: DeviceEventPayload) {
+    const eventIdentity =
+        event.deviceId ??
+        event.id ??
+        event.deviceCode ??
+        event.device?.deviceId ??
+        event.device?.id ??
+        event.device?.deviceCode ??
+        null;
+
+    return Boolean(
+        eventIdentity &&
+            (device.deviceId === eventIdentity ||
+                device.id === eventIdentity ||
+                device.deviceCode === eventIdentity)
+    );
+}
+
+function applyDeviceEvent(device: DeviceItem, event: DeviceEventPayload): DeviceItem {
+    if (!matchesDeviceEvent(device, event)) {
+        return device;
+    }
+
+    return {
+        ...device,
+        status: event.status ?? event.device?.status ?? device.status,
+        isOnline:
+            typeof event.isOnline === "boolean"
+                ? event.isOnline
+                : typeof event.device?.isOnline === "boolean"
+                  ? event.device.isOnline
+                  : device.isOnline,
+        lastSeen: event.lastSeen ?? event.device?.lastSeen ?? device.lastSeen,
+    };
+}
+
+function summarizeDevices(devices: DeviceItem[]) {
+    return {
+        total: devices.length,
+        online: devices.filter((device) => device.isOnline).length,
+        offline: devices.filter((device) => !device.isOnline).length,
+        maintenance: devices.filter((device) => device.status === "maintenance").length,
+    };
+}
+
 function getActivationCode(result: DeviceActivationResult | null) {
-    return result?.CodeActivate ?? "";
+    return result?.activationCode ?? result?.CodeActivate ?? result?.code ?? "";
 }
 
 function formatDateTime(value?: string | null) {
@@ -204,6 +261,7 @@ function DevicesPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<DevicePayload>(DEFAULT_FORM);
     const [submitting, setSubmitting] = useState(false);
+    const [reissuingId, setReissuingId] = useState<string | null>(null);
     const [activationResult, setActivationResult] =
         useState<DeviceActivationResult | null>(null);
     const openModalRef = useRef(openModal);
@@ -281,6 +339,31 @@ function DevicesPage() {
         }
     }
 
+    function applyDeviceEventToState(data: DeviceEventPayload) {
+        setConfig((currentConfig) => {
+            if (!currentConfig?.devices.some((device) => matchesDeviceEvent(device, data))) {
+                return currentConfig;
+            }
+
+            const devices = currentConfig.devices.map((device) =>
+                applyDeviceEvent(device, data)
+            );
+
+            return {
+                ...currentConfig,
+                ...summarizeDevices(devices),
+                devices,
+            };
+        });
+
+        setCameraDevices((devices) =>
+            devices.map((device) => applyDeviceEvent(device, data))
+        );
+        setPrinterDevices((devices) =>
+            devices.map((device) => applyDeviceEvent(device, data))
+        );
+    }
+
     useEffect(() => {
         fetchConfig();
 
@@ -303,6 +386,7 @@ function DevicesPage() {
 
                 if (
                     eventType === "device_status_changed" ||
+                    eventType === "device_activation_reissued" ||
                     eventType === "device_activation_expired" ||
                     eventType === "device_activated" ||
                     eventType === "device_activation_success" ||
@@ -310,6 +394,17 @@ function DevicesPage() {
                     eventType === "device_deleted" ||
                     eventType === "devices_config_updated"
                 ) {
+                    if (
+                        eventType === "device_status_changed" ||
+                        eventType === "device_activated"
+                    ) {
+                        applyDeviceEventToState(data);
+                    }
+
+                    if (eventType === "device_status_changed") {
+                        return;
+                    }
+
                     const latestConfig = await fetchConfig(false);
 
                     if (eventType === "device_activation_expired") {
@@ -392,13 +487,22 @@ function DevicesPage() {
                     const chunks = buffer.split(/\r?\n\r?\n/);
                     buffer = chunks.pop() ?? "";
                     for (const chunk of chunks) {
-                        const dataText = chunk
-                            .split(/\r?\n/)
-                            .filter((line) => line.startsWith("data:"))
-                            .map((line) => line.slice(5).trim())
-                            .join("\n");
+                        let eventName = "message";
+                        const dataLines: string[] = [];
+
+                        chunk.split(/\r?\n/).forEach((line) => {
+                            if (line.startsWith("event:")) {
+                                eventName = line.slice(6).trim() || "message";
+                            }
+
+                            if (line.startsWith("data:")) {
+                                dataLines.push(line.slice(5).trim());
+                            }
+                        });
+
+                        const dataText = dataLines.join("\n");
                         if (dataText) {
-                            await handleDeviceEvent(new MessageEvent("message", { data: dataText }));
+                            await handleDeviceEvent(new MessageEvent(eventName, { data: dataText }));
                         }
                     }
                 }
@@ -643,7 +747,6 @@ function DevicesPage() {
                       ? {
                             deviceName: name,
                             deviceType: BARRIER_GATE_DEVICE_TYPE,
-                            deviceCode: form.deviceCode || undefined,
                             location,
                             gateId: form.gateId?.trim(),
                             direction: form.direction,
@@ -654,7 +757,6 @@ function DevicesPage() {
                             name,
                             deviceName: name,
                             deviceType: form.deviceType,
-                            deviceCode: form.deviceCode || undefined,
                             location,
                             printerIds: (form.printerIds ?? []).filter(Boolean),
                             connectionType: form.connectionType || undefined,
@@ -728,6 +830,87 @@ function DevicesPage() {
             setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
         } finally {
             setSubmitting(false);
+        }
+    }
+
+    async function handleReissueActivationCode(device: DeviceItem) {
+        const deviceId = device.deviceId ?? device.id ?? "";
+
+        if (!deviceId) {
+            setError("Device ID is required to refresh activation code");
+            return;
+        }
+
+        if (!isKioskType(device.deviceType) && !isBarrierGateType(device.deviceType)) {
+            setError("Refresh Code is only available for Kiosk and Barrier Gate");
+            return;
+        }
+
+        const confirmed = window.confirm(
+            "This will invalidate the old device token and generate a new activation code for this existing device."
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setError("");
+            setMessage("");
+            setReissuingId(deviceId);
+
+            const token = getToken();
+            const response = await fetch(
+                `/api/devices/devices/${deviceId}/reissue-activation-code`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...getAuthHeaders(token),
+                    },
+                    cache: "no-store",
+                }
+            );
+            const result = (await response.json().catch(() => null)) as
+                | DeviceActivationCodeReissueResponse
+                | null;
+
+            if (!response.ok || !result) {
+                throw new Error(getErrorMessage(result, "Refresh activation code failed"));
+            }
+
+            setModalMode("edit");
+            setEditingId(deviceId);
+            setForm({
+                deviceId: result.device?.deviceId ?? result.deviceId,
+                activationCode: result.activationCode,
+                expiresAt: result.expiresAt,
+                activationExpiresAt: result.expiresAt,
+                deviceCode: device.deviceCode ?? "",
+                deviceName: result.device?.deviceName ?? result.deviceName,
+                deviceType: result.device?.deviceType ?? result.deviceType,
+                connectionType: device.connectionType ?? "",
+                ipAddress: device.ipAddress ?? null,
+                status: result.device?.status ?? device.status,
+                isOnline: result.device?.isOnline ?? device.isOnline,
+                note: device.note ?? "",
+                location: device.location ?? "",
+                gateId: result.device?.gateId ?? device.gateId ?? "",
+                direction: result.device?.direction ?? device.direction ?? "IN",
+                cameraRole: device.cameraRole ?? null,
+                printerRole: device.printerRole ?? null,
+                cameraIds: result.device?.cameraIds ?? device.cameraIds ?? [],
+                printerIds: result.device?.printerIds ?? device.printerIds ?? [],
+            });
+            setActivationResult({
+                ...result,
+                CodeActivate: result.activationCode,
+                recovery: true,
+            });
+            setOpenModal(true);
+            await fetchConfig(false);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Refresh activation code failed");
+        } finally {
+            setReissuingId(null);
         }
     }
 
@@ -1047,6 +1230,26 @@ function DevicesPage() {
                                                         <span className="rounded-full border border-[#D0D5DD] bg-white px-3 py-1 text-[12px] font-bold text-[#475467]">
                                                             {getDeviceTypeLabel(device.deviceType)}
                                                         </span>
+
+                                                        {(isKioskType(device.deviceType) || isBarrierGateType(device.deviceType)) &&
+                                                        !device.isOnline ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReissueActivationCode(device)}
+                                                                disabled={reissuingId === (device.deviceId ?? device.id)}
+                                                                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#D0D5DD] px-3 text-[12px] font-bold text-[#061D36] transition hover:bg-[#E5E7EB] disabled:opacity-60"
+                                                            >
+                                                                <LuRefreshCw
+                                                                    size={15}
+                                                                    className={
+                                                                        reissuingId === (device.deviceId ?? device.id)
+                                                                            ? "animate-spin"
+                                                                            : ""
+                                                                    }
+                                                                />
+                                                                Refresh Code
+                                                            </button>
+                                                        ) : null}
 
                                                         {isKioskType(device.deviceType) || isBarrierGateType(device.deviceType) ? (
                                                             <button

@@ -27,8 +27,9 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
         }
 
         const authorization = req.headers.get("authorization");
+        const encodedId = encodeURIComponent(id);
 
-        const response = await fetch(`${baseUrl}/api/v1/transactions/${id}`, {
+        const response = await fetch(`${baseUrl}/api/v1/transactions/${encodedId}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -62,7 +63,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
         const authorization = req.headers.get("authorization");
         const body = await req.json().catch(() => null);
-        const response = await fetch(`${baseUrl}/api/v1/transactions/${id}`, {
+        const encodedId = encodeURIComponent(id);
+        const response = await fetch(`${baseUrl}/api/v1/transactions/${encodedId}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",

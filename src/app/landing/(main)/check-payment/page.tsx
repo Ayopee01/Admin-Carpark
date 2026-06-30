@@ -64,6 +64,14 @@ function isDateInRange(value: string | null | undefined, range?: DateRange) {
   return target >= from && target <= to;
 }
 
+function getDateTimeValue(value: string | null | undefined) {
+  if (!value) return 0;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
 function getLastPayment(item: RawTransactionItem) {
   return item.latestPayment;
 }
@@ -101,12 +109,15 @@ function CheckPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
+  const [isRealtime, setIsRealtime] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<TransactionEditDraft | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<TransactionItem | null>(null);
   const [openPaymentModal, setOpenPaymentModal] = useState(false);
 
   const loadingTimerRef = useRef<number | null>(null);
@@ -114,19 +125,32 @@ function CheckPaymentPage() {
   const filteredItems = useMemo(() => {
     const keyword = debouncedSearchPlate.trim().toLowerCase();
 
-    return items.filter((item) => {
-      const plateNo = item.plateNo ?? "";
-      const billNo = item.billNo ?? "";
-      const matchKeyword = keyword
-        ? plateNo.toLowerCase().includes(keyword) ||
-        billNo.toLowerCase().includes(keyword)
-        : true;
+    return items
+      .filter((item) => {
+        const plateNo = item.plateNo ?? "";
+        const billNo = item.billNo ?? "";
+        const matchKeyword = keyword
+          ? plateNo.toLowerCase().includes(keyword) ||
+          billNo.toLowerCase().includes(keyword)
+          : true;
 
-      const matchStatus = status === "all" ? true : item.status === status;
-      const matchDate = isDateInRange(item.entryAt, dateRange);
+        const matchStatus = status === "all" ? true : item.status === status;
+        const matchDate = isDateInRange(item.entryAt, dateRange);
 
-      return matchKeyword && matchStatus && matchDate;
-    });
+        return matchKeyword && matchStatus && matchDate;
+      })
+      .sort((a, b) => {
+        const latestA = Math.max(
+          getDateTimeValue(a.entryAt),
+          getDateTimeValue(a.payment.paidAt)
+        );
+        const latestB = Math.max(
+          getDateTimeValue(b.entryAt),
+          getDateTimeValue(b.payment.paidAt)
+        );
+
+        return latestB - latestA;
+      });
   }, [items, debouncedSearchPlate, status, dateRange]);
 
   const filteredTotal = filteredItems.length;
@@ -176,18 +200,20 @@ function CheckPaymentPage() {
     }, 350);
   }
 
-  async function fetchTransactions(): Promise<void> {
+  async function fetchTransactions(showLoading = false): Promise<void> {
     try {
-      if (items.length === 0) {
+      if (showLoading) {
         setLoading(true);
+        setProgress(8);
       }
 
-      setProgress(8);
       setError("");
 
       const token = localStorage.getItem("token");
 
-      setProgress(18);
+      if (showLoading) {
+        setProgress(18);
+      }
 
       const response = await fetch("/api/check-payment/transactions?all=true", {
         method: "GET",
@@ -198,11 +224,15 @@ function CheckPaymentPage() {
         cache: "no-store",
       });
 
-      setProgress(60);
+      if (showLoading) {
+        setProgress(60);
+      }
 
       const raw = (await response.json().catch(() => null)) as TransactionListApiResponse | null;
 
-      setProgress(82);
+      if (showLoading) {
+        setProgress(82);
+      }
 
       if (!response.ok) {
         throw new Error(getErrorMessage(raw, "ไม่สามารถโหลดข้อมูลได้"));
@@ -215,22 +245,143 @@ function CheckPaymentPage() {
       const normalizedItems = (raw.data ?? []).map(normalizeTransaction);
 
       setItems(normalizedItems);
-      setProgress(100);
+      if (showLoading) {
+        setProgress(100);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-      setProgress(100);
+      if (showLoading) {
+        setProgress(100);
+      }
     } finally {
-      finishLoadingAfterDelay();
+      if (showLoading) {
+        finishLoadingAfterDelay();
+      }
     }
   }
 
   useEffect(() => {
-    void fetchTransactions();
+    void fetchTransactions(true);
 
     return () => {
       if (loadingTimerRef.current) {
         window.clearTimeout(loadingTimerRef.current);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let reconnectTimer: number | undefined;
+    let pollingTimer: number | undefined;
+    let refetchTimer: number | undefined;
+    let eventsUnsupported = false;
+
+    function scheduleRefetch() {
+      if (refetchTimer) {
+        window.clearTimeout(refetchTimer);
+      }
+
+      refetchTimer = window.setTimeout(() => {
+        void fetchTransactions(false);
+      }, 300);
+    }
+
+    async function pollTransactions() {
+      try {
+        await fetchTransactions(false);
+      } catch {
+        // The next polling interval retries automatically.
+      }
+    }
+
+    function startPolling() {
+      setIsRealtime(false);
+
+      if (pollingTimer) return;
+
+      void pollTransactions();
+      pollingTimer = window.setInterval(pollTransactions, 30000);
+    }
+
+    async function connect() {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch("/api/check-payment/transactions/events", {
+          headers: {
+            Accept: "text/event-stream",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          signal: controller.signal,
+        });
+
+        if (response.status === 404 || response.status === 501) {
+          eventsUnsupported = true;
+          startPolling();
+          return;
+        }
+
+        if (!response.ok || !response.body) {
+          throw new Error("SSE unavailable");
+        }
+
+        setIsRealtime(true);
+
+        if (pollingTimer) {
+          window.clearInterval(pollingTimer);
+          pollingTimer = undefined;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!controller.signal.aborted) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split(/\r?\n\r?\n/);
+          buffer = chunks.pop() ?? "";
+
+          for (const chunk of chunks) {
+            const dataText = chunk
+              .split(/\r?\n/)
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trim())
+              .join("\n");
+
+            if (!dataText) continue;
+
+            const event = JSON.parse(dataText) as { type?: string };
+            if (event.type === "connected" || event.type === "ping") continue;
+
+            scheduleRefetch();
+          }
+        }
+
+        if (!controller.signal.aborted) {
+          throw new Error("SSE disconnected");
+        }
+      } catch {
+        if (controller.signal.aborted) return;
+
+        startPolling();
+
+        if (!eventsUnsupported) {
+          reconnectTimer = window.setTimeout(connect, 5000);
+        }
+      }
+    }
+
+    void connect();
+
+    return () => {
+      controller.abort();
+
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (pollingTimer) window.clearInterval(pollingTimer);
+      if (refetchTimer) window.clearTimeout(refetchTimer);
     };
   }, []);
 
@@ -320,7 +471,7 @@ function CheckPaymentPage() {
       }
 
       handleCancelEdit();
-      await fetchTransactions();
+      await fetchTransactions(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
@@ -329,6 +480,7 @@ function CheckPaymentPage() {
   }
 
   function handleOpenPayment(id: string) {
+    setSelectedTransaction(items.find((item) => item.id === id) ?? null);
     setSelectedId(id);
     setOpenPaymentModal(true);
   }
@@ -336,6 +488,7 @@ function CheckPaymentPage() {
   function handleClosePayment() {
     setOpenPaymentModal(false);
     setSelectedId(null);
+    setSelectedTransaction(null);
   }
 
   if (loading) {
@@ -364,7 +517,7 @@ function CheckPaymentPage() {
 
             <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
               <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-              <span>Online</span>
+              <span>{isRealtime ? "Realtime" : "Online"}</span>
             </div>
           </div>
 
@@ -524,8 +677,9 @@ function CheckPaymentPage() {
       <PaymentModal
         open={openPaymentModal}
         transactionId={selectedId}
+        transaction={selectedTransaction}
         onClose={handleClosePayment}
-        onSuccess={fetchTransactions}
+        onSuccess={() => fetchTransactions(false)}
       />
     </>
   );

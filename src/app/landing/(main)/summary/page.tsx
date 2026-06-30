@@ -20,6 +20,7 @@ import ServiceSummaryCard from "@/src/app/components/summary/ServiceSummaryCard"
 
 import type {
     OverviewRevenueGroup,
+    OverviewSseEvent,
     OverviewSummaryResponse,
 } from "@/src/app/type/summary/summary";
 
@@ -50,11 +51,25 @@ function getDateRangeParams(range?: DateRange) {
     };
 }
 
+function getErrorMessage(value: unknown, fallback: string) {
+    if (
+        value &&
+        typeof value === "object" &&
+        "message" in value &&
+        typeof value.message === "string"
+    ) {
+        return value.message;
+    }
+
+    return fallback;
+}
+
 function SummaryPage() {
     const [data, setData] = useState<OverviewSummaryResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState("");
+    const [isRealtime, setIsRealtime] = useState(false);
 
     const [selectedRange, setSelectedRange] = useState<DateRange | undefined>();
 
@@ -152,6 +167,133 @@ function SummaryPage() {
         };
     }, [selectedEndDate, selectedStartDate]);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        let reconnectTimer: number | undefined;
+
+        function buildEventsUrl() {
+            const query = new URLSearchParams();
+
+            if (selectedStartDate) {
+                query.set("start_date", selectedStartDate);
+            }
+
+            if (selectedEndDate) {
+                query.set("end_date", selectedEndDate);
+            }
+
+            return `/api/summary/events${query.toString() ? `?${query.toString()}` : ""}`;
+        }
+
+        function handleOverviewEvent(event: OverviewSseEvent) {
+            if (
+                event.type === "overview_snapshot" ||
+                event.type === "overview_summary" ||
+                event.type === "overview_updated"
+            ) {
+                setData(event.data);
+                setError("");
+                setIsRealtime(true);
+                return;
+            }
+
+            if (event.type === "overview_error") {
+                setIsRealtime(false);
+            }
+        }
+
+        async function connect() {
+            try {
+                const token = localStorage.getItem("token");
+                const response = await fetch(buildEventsUrl(), {
+                    headers: {
+                        Accept: "text/event-stream",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    signal: controller.signal,
+                    cache: "no-store",
+                });
+
+                if (!response.ok || !response.body) {
+                    const result = await response.json().catch(() => null);
+                    const message = getErrorMessage(
+                        result,
+                        response.status === 400
+                            ? "Invalid overview date range"
+                            : response.status === 401
+                                ? "Unauthorized"
+                                : response.status === 403
+                                    ? "Forbidden"
+                                    : "Overview event stream unavailable"
+                    );
+
+                    if (
+                        response.status === 400 ||
+                        response.status === 401 ||
+                        response.status === 403
+                    ) {
+                        setIsRealtime(false);
+                        setError(message);
+                        return;
+                    }
+
+                    throw new Error(message);
+                }
+
+                setIsRealtime(true);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+
+                while (!controller.signal.aborted) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const chunks = buffer.split(/\r?\n\r?\n/);
+                    buffer = chunks.pop() ?? "";
+
+                    for (const chunk of chunks) {
+                        const dataText = chunk
+                            .split(/\r?\n/)
+                            .filter((line) => line.startsWith("data:"))
+                            .map((line) => line.slice(5).trim())
+                            .join("\n");
+
+                        if (!dataText) continue;
+
+                        const event = JSON.parse(dataText) as OverviewSseEvent;
+                        if (event.type === "connected" || event.type === "ping") {
+                            continue;
+                        }
+
+                        handleOverviewEvent(event);
+                    }
+                }
+
+                if (!controller.signal.aborted) {
+                    throw new Error("Overview event stream disconnected");
+                }
+            } catch {
+                if (controller.signal.aborted) return;
+
+                setIsRealtime(false);
+                reconnectTimer = window.setTimeout(connect, 5000);
+            }
+        }
+
+        void connect();
+
+        return () => {
+            controller.abort();
+
+            if (reconnectTimer) {
+                window.clearTimeout(reconnectTimer);
+            }
+        };
+    }, [selectedEndDate, selectedStartDate]);
+
     function formatNumber(value: number) {
         return new Intl.NumberFormat("en-US").format(value);
     }
@@ -191,12 +333,20 @@ function SummaryPage() {
 
     const realtimeBadge = useMemo(
         () => (
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#49C85B] bg-[#F5FFF6] px-4 py-2 text-[13px] font-semibold text-[#38B449]">
-                <span className="h-2 w-2 rounded-full bg-[#38B449]" />
-                <span>Online</span>
+            <div
+                className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold ${isRealtime
+                    ? "border-[#49C85B] bg-[#F5FFF6] text-[#38B449]"
+                    : "border-[#D8DADF] bg-white text-[#6B7280]"
+                    }`}
+            >
+                <span
+                    className={`h-2 w-2 rounded-full ${isRealtime ? "bg-[#38B449]" : "bg-[#9CA3AF]"
+                        }`}
+                />
+                <span>{isRealtime ? "Realtime" : "Online"}</span>
             </div>
         ),
-        []
+        [isRealtime]
     );
 
     if (loading) {

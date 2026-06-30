@@ -17,6 +17,7 @@ type DeviceActivationResult = {
     deviceId?: string | null;
     expiresAt?: string | null;
     expiresIn?: string;
+    recovery?: boolean;
 };
 
 type Props = {
@@ -64,6 +65,7 @@ function DeviceModal({
     const selectedCameraIds = form.cameraIds ?? [];
     const selectedPrinterIds = form.printerIds ?? [];
     const activationCode = getActivationCode(activationResult ?? null);
+    const isRecoveryCode = Boolean(activationResult?.recovery);
     const activationExpiresAt =
         activationResult?.expiresAt ?? form.expiresAt ?? null;
     const statusLabel =
@@ -204,7 +206,7 @@ function DeviceModal({
                 {activationCode ? (
                     <div className="mt-7 rounded-[14px] border border-[#BBF7D0] bg-[#F0FDF4] p-5">
                         <p className="text-[18px] font-bold text-[#166534]">
-                            Activation code created
+                            {isRecoveryCode ? "Activation code refreshed" : "Activation code created"}
                         </p>
                         {activationResult?.message ? (
                             <p className="mt-1 text-[13px] text-[#15803D]">
@@ -221,13 +223,19 @@ function DeviceModal({
                             </p>
                         </div>
 
+                        {isRecoveryCode ? (
+                            <div className="mt-4 rounded-[12px] border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-[13px] font-medium leading-relaxed text-[#1D4ED8]">
+                                Use this code on the existing Kiosk or Barrier Gate. The device will receive a new device token after activation, while the same deviceId and existing camera/printer mappings remain unchanged. You do not need to create a new device.
+                            </div>
+                        ) : null}
+
                         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="rounded-[10px] bg-white p-3">
                                 <p className="text-[12px] text-[#64748B]">
                                     Device ID
                                 </p>
                                 <p className="mt-1 text-[14px] font-bold text-[#061D36]">
-                                    {(activationResult?.deviceId ?? form.deviceCode) || "Waiting for activation"}
+                                    {activationResult?.deviceId ?? "Waiting for activation"}
                                 </p>
                             </div>
 
@@ -243,25 +251,6 @@ function DeviceModal({
                     </div>
                 ) : (
                     <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {isBarrierGate ? (
-                            <div>
-                                <label className="mb-2 block text-[13px] text-[#6B7280]">
-                                    Device Code
-                                </label>
-                                <input
-                                    value={form.deviceCode}
-                                    onChange={(event) =>
-                                        onChange((prev) => ({
-                                            ...prev,
-                                            deviceCode: event.target.value,
-                                        }))
-                                    }
-                                    placeholder="BG-GATE-A"
-                                    className="h-11 w-full rounded-md border border-[#E5E7EB] bg-[#F1F2F3] px-4 text-[14px] outline-none"
-                                />
-                            </div>
-                        ) : null}
-
                         <div className="sm:col-span-2">
                             <label className="mb-2 block text-[13px] text-[#6B7280]">
                                 Device Name

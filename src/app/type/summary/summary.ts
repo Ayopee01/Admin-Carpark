@@ -45,3 +45,24 @@ export type OverviewSummaryResponse = {
     serviceSummary: OverviewServiceSummaryItem[];
     totalSummaryCalculated: number;
 };
+
+export type OverviewSseEvent =
+    | {
+        type: "connected";
+        message: string;
+    }
+    | {
+        type: "overview_snapshot" | "overview_summary" | "overview_updated";
+        trigger?: unknown;
+        data: OverviewSummaryResponse;
+        generatedAt: string;
+    }
+    | {
+        type: "overview_error";
+        message: string;
+        generatedAt: string;
+    }
+    | {
+        type: "ping";
+        at: string;
+    };

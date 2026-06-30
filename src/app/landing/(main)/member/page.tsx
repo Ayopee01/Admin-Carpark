@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   LuCheck,
   LuCreditCard,
-  LuDownload,
   LuLayoutDashboard,
   LuPalette,
   LuPencil,
@@ -555,21 +554,6 @@ function MemberPage() {
     }
   }
 
-  function handleDownload() {
-    const blob = new Blob([JSON.stringify(members, null, 2)], {
-      type: "application/json",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = "members.json";
-    link.click();
-
-    URL.revokeObjectURL(url);
-  }
-
   if (loading) {
     return (
       <Preload
@@ -617,15 +601,6 @@ function MemberPage() {
                   className="ml-3 min-w-0 w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
                 />
               </div>
-
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="inline-flex h-12 items-center gap-3 rounded-full bg-slate-900 px-7 text-sm font-bold text-white transition hover:opacity-90"
-              >
-                <LuDownload size={17} />
-                ดาวน์โหลด
-              </button>
 
               <button
                 type="button"

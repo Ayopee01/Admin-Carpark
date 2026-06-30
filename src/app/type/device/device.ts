@@ -63,6 +63,23 @@ export type DeviceActivationCodeCreateResponse = {
   isOnline: boolean;
 };
 
+export type DeviceActivationCodeReissueResponse = {
+  success: boolean;
+  message: string;
+  deviceId: string;
+  deviceName: string;
+  deviceType: "kiosk" | "barrier_gate";
+  activationCode: string;
+  expiresAt: ISODateString;
+  device: Partial<DeviceItem> & {
+    deviceId: string;
+    deviceName: string;
+    deviceType: "kiosk" | "barrier_gate";
+    status: DeviceStatus;
+    isOnline: boolean;
+  };
+};
+
 export type DevicePayload = {
   deviceCode: string;
   deviceName: string;
